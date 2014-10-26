@@ -1,6 +1,21 @@
+# Author: Samuel Genheden samuel.genheden@gmail.com
+
+"""
+Classes to read, write and manipulate PDB files
+
+The module contains the following public classes:
+  - PDBFile -- the top-level structural class,
+    contains chains, residues and atoms
+  - Residue -- class to hold a collection of atoms
+  - Atom -- class to represent an ATOM or HETATOM record
+"""
+
 import sys
+import copy
+
 import numpy as np
 from scipy.spatial.distance import cdist
+
 
 heavy_aa = {"ALA":["N","CA","CB","C","O"],
 "GLY":["N","CA","C","O"],
@@ -51,10 +66,27 @@ std_aa_names["TYR"]="N H CA HA CB HB2 HB3 CG CD1 HD1 CE1 HE1 CZ OH HH CE2 HE2 CD
 std_aa_names["TRP"]="N H CA HA CB HB2 HB3 CG CD1 HD1 NE1 HE1 CE2 CZ2 HZ2 CH2 HH2 CZ3 HZ3 CE3 HE3 CD2 C O".split()
 std_aa_names["CYX"]="N H CA HA CB HB2 HB3 SG C O".split()
 
-#
-# A class to encapsulate atoms, residues and chains from a PDB-file
-#
 class PDBFile :
+  """
+  A class to encapsulate atoms, residues and chains from a PDB-file
+  
+  Attributes:
+  -----------
+  atom : list of Atom objects
+    the atoms
+  residue : list of Residue objects
+    the residues
+  chains : list of tuples of integers
+    the chains
+  xyz : numpy array
+    the Cartesian coordinates
+  filename : string
+    the name of the file that was parsed into this object
+  charged : list of Residue objects
+    the charge residues
+  box : numpy array
+    the box information
+  """
   def __init__(self,filename=None)  :
     self.atoms = []
     self.residues = []
@@ -67,24 +99,76 @@ class PDBFile :
       self.read(filename)
   
   def extend(self,other) :
+    """
+    Extend this structure with atoms and residues from another structure
+    
+    Parameters
+    ----------
+    other : PDBFile object
+      the structure to extend self with
+    """
     for atom in other.atoms :
       self.atoms.append(atom)
     for residue in other.residues :
       self.residues.append(residue)
-    self.__parse_chains()    
-  
-  # Return a list of the indices of residues at the end of chains    
+    self.__parse_chains()
+    
+  def extend_residues(self,residues,makecopy=True) :
+    """
+    Extend this structure with atoms and residues from a list of residues
+    
+    Parameters
+    ----------
+    residues : list of Residue objects
+      the residues to extend self with
+    makecopy : boolean, optional
+      if to make a copy of the residues or not
+    """
+    for residue in residues :
+      if makecopy :
+        newres = copy.deepcopy(residue)
+      else :
+        newres = residue
+      self.residues.append(newres)
+      for atom in newres.atoms : self.atoms.append(atom) 
+      self.__parse_chains()   
+ 
+  def renumber(self,doatoms=True,doresidues=True) :
+    """
+    Renumber atoms and residues from 1
+    
+    Parameters
+    ----------
+    doatoms : boolean, optional
+      if to renumber atoms
+    doresidues : boolean, optional
+      if to renumber residues
+    """
+    if doresidues :
+      for i,residue in enumerate(self.residues,1) :
+        residue.serial = i
+        for atom in residue.atoms : atom.residue = i
+    if doatoms :
+      for i,atom in enumerate(self.atoms,1) :
+        atom.serial = i
+   
   def cterminal(self) :
+    """
+    Return a list of the indices of residues at the end of chains   
+    """
     return [chain[1] for chain in self.chains]
     
-  # Return a list of the indices of residues at the start of chains
   def nterminal(self) :
+    """
+    Return a list of the indices of residues at the start of chains
+    """
     return [chain[0] for chain in self.chains]
-    
-  # Produce, store and return a list of charged residues (including C- and N-terminals)    
+        
   def charged_residues(self) :
-  
-    if not self.residues : return []
+    """
+    Produce, store and return a list of charged residues (including C- and N-terminals)
+    """
+    if not self.residues : return [] 
     if self.charged != None : return self.charged
     
     self.charged = []
@@ -98,26 +182,57 @@ class PDBFile :
       if not taken[chain[0]] : self.charged.append(self.residues[chain[0]])
       if not taken[chain[1]] : self.charged.append(self.residues[chain[1]])
     return self.charged
-    
-  #
-  # Read a PDB-file or GRO-file and parse into atoms, residues and chains
-  #
+
   def read(self,filename,gro=False) :
+    """
+    Read a PDB-file or GRO-file and parse into atoms, residues and chains
+    
+    Parameters
+    ----------
+    filename : string
+      the name of the file to parse
+    gro : boolean, optional
+      if to force parsing of GRO structure
+    """
     self.filename = filename
-    if not gro :
+    if filename[-3:].lower() != ".gro" or not gro :
       self.__parse_records()
     else :
       self.__parse_gro_records()
     self.__parse_residues()
     self.__parse_chains()
 
-  #
-  # Write all residues to file
-  #
   def write(self,filename=None,ter=False,add_extra=None) :
-    if filename == None :
+    """
+    Write the structure to a file
+    
+    Parameters
+    ----------
+    filename : string, optional
+      the name of the file to write to
+    ter : boolean, optional
+      if to add TER records
+    add_extra : function, optional
+      function to add extra, non ATOM, HETATM and TER records
+    """
+    if filename is None :
       filename = self.filename
-    f = open(filename,"w")
+    with open(filename,"w") as f :
+      self.write_to(f,ter=ter,add_extra=add_extra)
+
+  def write_to(self,f,ter=False,add_extra=None) :
+    """
+    Write the structure to a file object
+    
+    Parameters
+    ----------
+    f : File object
+      the file object to write to
+    ter : boolean, optional
+      if to add TER records
+    add_extra : function, optional
+      function to add extra, non ATOM, HETATM and TER records
+    """
     if self.box != None :
       f.write("CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2fP 1\n"%(self.box[0],self.box[1],self.box[2],90.0,90.0,90.0))
     # If TER record not wanted, the just print out each residue
@@ -134,6 +249,7 @@ class PDBFile :
       # Then write out each HET residues, followed by a TER
       if len(self.chains) > 0 :
         for i in range(self.chains[-1][1]+1,len(self.residues)) :
+          if self.residues[i].hidden : continue
           f.write(self.residues[i].__str__())
           f.write("TER\n")
       else :
@@ -141,12 +257,14 @@ class PDBFile :
           f.write(residue.__str__())
           f.write("TER\n")
     if add_extra : add_extra(self,f)
-    f.close()
-
-  #
-  #
-  #
+    
   def write_gro(self,filename=None) :
+    """
+    Write the structure to a GRO-file
+    
+    filename : string, optional
+      the name of the file to write to
+    """
     if filename == None :
       filename = self.filename
     f = open(filename,"w")
@@ -158,16 +276,12 @@ class PDBFile :
       f.write("%8.3f%8.3f%8.3f\n"%(self.box[0]/10.0,self.box[1]/10.0,self.box[2]/10.0))
     else :
        f.write("%8.3f%8.3f%8.3f\n"%(0.0,0.0,0.0))
-
-#          1         2         3         4
-#0123456789012345678901234567890123456789012345678901234567890123456789
-# 5248SOL     H233024   4.444   0.859   0.806  0.6749 -0.4063  0.6694
     
-  #
-  # Find start and end of chains from an array of Residue objects 
-  # This only identify chains of ATOM records, not HETATM 
-  #
   def __parse_chains(self) :
+    """
+    Find start and end of chains from an array of Residue objects 
+    This only identify chains of ATOM records, not HETATM 
+    """
     self.chains = []
     first = 0
     last = -1
@@ -187,11 +301,11 @@ class PDBFile :
     if not self.residues[-1].atoms[0].hetatm :
       last = i-1
       self.chains.append((first,last))
-  #
-  # Produce an array of Residue objectes from an array of Atom objects
-  #
-  def __parse_residues(self) :
 
+  def __parse_residues(self) :
+    """
+    Produce an array of Residue objectes from an array of Atom objects
+    """
     residues = []
     self.residues.append(Residue(idx=0,atom=self.atoms[0]))
     
@@ -200,34 +314,31 @@ class PDBFile :
         self.residues.append(Residue(idx=len(self.residues),atom=atom))
       else :
         self.residues[-1].append(atom)
-  #
-  # Read ATOM/HETATM records from PDB file and create an array of Atom objects
-  # and a numpy array of coordinates
-  #
+        
   def __parse_records(self) :
-
+    """
+    Read ATOM/HETATM records from PDB file and create an array of Atom objects
+    and a numpy array of coordinates
+    """
     self.atoms = []
     self.xyz = []
-    f = open(self.filename,"r")
-    line = f.readline()
-    while line :
-      if line[0:6] in ["ATOM  ","HETATM"] :
-        atom = Atom(record=line,idx=len(self.atoms))
-        self.atoms.append(atom)
-        self.xyz.append([atom.x,atom.y,atom.z])
-      elif line[0:6] == "CRYST1" :
-        self.box = np.array(line.strip().split()[1:4],dtype=float)
+    with open(self.filename,"r") as f :
       line = f.readline()
-    f.close()
-
+      while line :
+        if line[0:6] in ["ATOM  ","HETATM"] :
+          atom = Atom(record=line,idx=len(self.atoms))
+          self.atoms.append(atom)
+          self.xyz.append([atom.x,atom.y,atom.z])
+        elif line[0:6] == "CRYST1" :
+          self.box = np.array(line.strip().split()[1:4],dtype=float)
+        line = f.readline()
     self.xyz = np.array(self.xyz)
 
-  #
-  # Read ATOM/HETATM records from GRO file and create an array of Atom objects
-  # and a numpy array of coordinates
-  #
   def __parse_gro_records(self) :
-
+    """
+    Read ATOM/HETATM records from GRO file and create an array of Atom objects
+    and a numpy array of coordinates
+    """
     self.atoms = []
     self.xyz = []
     lines = open(self.filename,"r").readlines()
@@ -239,11 +350,45 @@ class PDBFile :
 
     self.xyz = np.array(self.xyz)
     self.box = np.array(lines[-1].strip().split(),dtype=float)*10.0
-#
-# A class to encapsulate an atom from a PDB-file
-#
+
 class Atom :
-  def __init__(self,idx=None,record=None,copy=None) :
+  """
+  A class to encapsulate an atom from a PDB-file
+  
+  Attributes
+  ----------
+  idx : integer
+    the serial number in the PDB-file atom list
+  hetatm : boolean
+    if this a HETATM record
+  serial : integer
+    the serial number as read from the PDB-file
+  name : string
+    the atom name
+  altloc : string
+    the alternative location
+  resname : string
+    the residue name
+  chain : string 
+    the chain identifier
+  residue : integer
+    the residue serial number
+  insertion : string
+    the insertion code
+  x, y, z : float
+    the Cartesian coordinates
+  occupancy : float
+    the occupancy
+  bfactor : float
+    the bfactor
+  term : string
+    the rest of the record
+  xyz : numpy array
+    the Cartesian coordinates
+  hidden : boolean
+    indicates if this should be written to file
+  """
+  def __init__(self,idx=None,record=None) :
     self.idx = idx
     self.hetatm = False
     self.serial = 0
@@ -263,12 +408,11 @@ class Atom :
     self.hidden = False
     if record :
       self.readRecord(record)
-    if copy :
-      self.copy(copy)
-  #
-  # Produces a string representation of the atom, i.e. an ATOM/HETATM PDB record
-  #
+
   def __str__(self) :
+    """
+    Produces a string representation of the atom, i.e. an ATOM/HETATM PDB record
+    """
     if self.hidden : return ""
     record = {False:"ATOM  ",True:"HETATM"}
     name = self.name
@@ -279,13 +423,11 @@ class Atom :
       resname = self.resname[:3]
     if self.term == "" or self.term[-1] != "\n" : self.term = self.term+ "\n"
     return "%6s%5d %4s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f%s"%(record[self.hetatm],self.serial,name,self.altloc,resname,self.chain,self.residue,self.insertion,self.x,self.y,self.z,self.occupancy,self.bfactor,self.term)    
-  #
-  # Read a record from a gro-file
-  #
-#          1         2         3         4
-#01234567890123456789012345678901234567890123456789
-#    1CHOL   ROH    1  -1.050   1.030   2.808
+
   def readGRO(self,record) :
+    """
+    Read a record from a GRO-file
+    """
     self.serial = int(record[15:20].strip())
     self.name = record[10:15].strip()
     #if len(self.name) > 4 :
@@ -310,10 +452,11 @@ class Atom :
     self.occupancy = 0.0
     self.bfactor = 0.0
     self.hidden = False
-  #
-  # Read a PDB HETATM or ATOM record
-  #
+
   def readRecord(self,record) :
+    """
+    Read a PDB HETATM or ATOM record
+    """
     self.hetatm = record[0:6] == "HETATM"
     self.serial = int(record[6:11].strip())
     self.name = record[12:16]
@@ -339,43 +482,27 @@ class Atom :
       self.term = "\n"
     self.xyz = np.array([self.x,self.y,self.z])
     self.hidden = False
-  # 
-  # Copy all properties of the atom
-  #
-  def copy(self,copy) :
-    self.idx = copy.idx
-    self.hetatm = copy.hetatm
-    self.serial = copy.serial
-    self.name = copy.name
-    self.altloc = copy.altloc
-    self.resname = copy.resname
-    self.chain = copy.chain
-    self.residue = copy.residue
-    self.insertion = copy.insertion
-    self.x = copy.x
-    self.y = copy.y
-    self.z = copy.z
-    self.occupancy = copy.occupancy
-    self.bfactor = copy.bfactor
-    self.term = copy.term
-    self.xyz = np.array(copy.xyz,copy=True)
-    self.hidden = copy.hidden
-  #
-  # Calculates the squared distances to another atom
-  #
+  
   def distance2(self,atom) :
+    """
+    Calculates the squared distances to another atom
+    """
     return (self.x-atom.x)**2+(self.y-atom.y)**2+(self.z-atom.z)**2
-  #
-  #
-  #
+
   def mass(self) : 
+    """
+    Returns the mass of this atom
+    """
     masses = {"h":1.00800,"c":12.01100,"n":14.00700,"o":15.99940,"p":30.97400,"s":32.066}
     if self.element() not in masses :
       raise Exception("Do not know the mass of element %s"%self.element())
     return masses[self.element()]
-  #
-  # 
+
   def element(self) :
+    """
+    Returns the element of this atom
+    ONLY works for single character elements
+    """
     name = self.name.strip().lower()
     try :
       trial = int(name[0])
@@ -384,10 +511,25 @@ class Atom :
       pass
     return name[0]
 
-#
-# Class to encapsulate a list of Atom objects
-#
 class Residue :
+  """
+  Class to encapsulate a collection of Atom objects
+  
+  Attributes
+  ----------
+  atoms : list of Atom objects
+    the atoms
+  idx : integer
+    the serial number of this residue in the PDBFile structure
+  hidden : boolean
+    if this residue should be written to file
+  serial : integer
+    the serial number as read from disc
+  resname : string
+    the name of this residue
+  chain : string
+    the chain identifier
+  """
   def __init__(self,idx=None,atom=None) :
     self.atoms = []
     self.idx = idx
@@ -399,31 +541,35 @@ class Residue :
       self.chain = atom.chain
       self.hidden = atom.hidden
     else :
-      self.serial = ""
+      self.serial = 1
       self.resname = ""
       self.chain   = ""
-  #
-  # Produces a string representation of all the atoms in the residues
-  #
+      
   def __str__(self) :
+    """
+    Produces a string representation of all the atoms in the residues
+    """
     if self.hidden : return ""
     return "".join([atom.__str__() for atom in self.atoms])
-  #
-  # Append another Atom object to the collection
-  #
+
   def append(self,atom) :
+    """
+    Append another Atom object to the collection
+    """
     self.atoms.append(atom)
     if len(self.atoms) == 1 :
-      #self.atoms.append(atom)
       self.serial = atom.residue
       self.resname = atom.resname
       self.chain = atom.chain
       self.hidden = atom.hidden  
-  #
-  # Check if an amino acid residue is complete
-  #
+
   def check_heavy(self) :
+    """
+    Check if an amino acid residue is complete
+    """
+    # Return if this is an empty collection or this residue is not an amino acid
     if len(self.atoms) == 0 or self.resname.upper() not in heavy_aa.keys() : return None,None
+    
     found = {}
     for aname in heavy_aa[self.resname.upper()] :
       found[aname] = 0
@@ -440,49 +586,70 @@ class Residue :
     for aname in heavy_aa[self.resname.upper()] :
       if found[aname] == 0 : notfound.append(aname)
     return notfound,extra
-  #
-  # Make a copy of the residue
-  #
-  def copy(self,residue) :
-    self.atoms = []
-    for atom in residue.atoms :
-      self.append(Atom(copy=atom))
-  # 
-  # Updates the residue name
-  #  
+
+  def set_hidden(self,hidden) :
+    """
+    Updates the hidden flag
+    """
+    self.hidden = hidden
+    for atom in self.atoms :
+      atom.hidden = hidden
+
   def set_resname(self,resname) :
-    resname = resname.upper()
-    if len(resname) > 3 : 
-      resname = resname[:3]
-    elif len(resname) < 3 :
-      resname = "%3s"%resname
-      
+    """
+    Updates the residue name
+    """
+    resname = resname.upper()      
     self.resname = resname
     for atom in self.atoms :
       atom.resname = resname
 
   def set_serial(self,serial) :
+    """
+    Updates the serial number
+    """
     self.serial = serial
     for atom in self.atoms :
       atom.residue = serial
 
-  #
-  # Calculates the minimum squared distance to another residue 
-  #
+  def update_xyz(self,xyz) :
+    """
+    Update the Cartesian coordinates of this residue
+    """
+    for i,atom in enumerate(self.atoms) :
+      atom.x = xyz[i,0]
+      atom.y = xyz[i,1]
+      atom.z = xyz[i,2]
+      atom.xyz = np.array(xyz[i,:],copy=True)
+
   def distance2(self,residue,xyz) :
+    """
+    Calculates the minimum squared distance to another residue
+    
+    Attributes
+    ----------
+    residue : Residue object
+      the other residue object
+    xyz : numpy array
+      all Cartesian coordinates of the PDBFile 
+    """
     xyz1 = xyz[self.atoms[0].idx:self.atoms[-1].idx+1,:]
     xyz2 = xyz[residue.atoms[0].idx:residue.atoms[-1].idx+1,:]
     mindist = cdist(xyz1,xyz2,"sqeuclidean").min()     
     return mindist
-  #
-  # Return whether this residues is within a cutoff of another residue
-  #
+
   def within(self,residue,xyz,cutoff) :
+    """
+    Return whether this residues is within a cutoff of another residue
+    """
     return self.distance2(residue,xyz) <= cutoff*cutoff
-  #
-  #
-  #
+
   def collect(self,operation) :
+    """
+    Perform an operation on the collection
+    
+    Can do center of mass, masses and xyz
+    """
     vector = np.zeros([len(self.atoms),3])
     operation = operation.lower()
     for i,atom in enumerate(self.atoms) :
@@ -496,12 +663,3 @@ class Residue :
     elif operation == "masses" :
       return vector[:,0]
     return vector 
-  #
-  #
-  #
-  def update_xyz(self,xyz) :
-    for i,atom in enumerate(self.atoms) :
-      atom.x = xyz[i,0]
-      atom.y = xyz[i,1]
-      atom.z = xyz[i,2]
-      atom.xyz = np.array(xyz[i,:],copy=True)
