@@ -195,10 +195,10 @@ class PDBFile :
       if to force parsing of GRO structure
     """
     self.filename = filename
-    if filename[-3:].lower() != ".gro" or not gro :
-      self.__parse_records()
-    else :
+    if filename[-3:].lower() == "gro" or gro :
       self.__parse_gro_records()
+    else :
+      self.__parse_records()
     self.__parse_residues()
     self.__parse_chains()
 
