@@ -422,7 +422,11 @@ class Atom :
     if len(self.resname) > 3 :
       resname = self.resname[:3]
     if self.term == "" or self.term[-1] != "\n" : self.term = self.term+ "\n"
-    return "%6s%5d %4s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f%s"%(record[self.hetatm],self.serial,name,self.altloc,resname,self.chain,self.residue,self.insertion,self.x,self.y,self.z,self.occupancy,self.bfactor,self.term)    
+    if self.residue > 9999 : 
+      resnr = self.residue - 9999
+    else :
+      resnr = self.residue
+    return "%6s%5d %4s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f%s"%(record[self.hetatm],self.serial,name,self.altloc,resname,self.chain,resnr,self.insertion,self.x,self.y,self.z,self.occupancy,self.bfactor,self.term)    
 
   def readGRO(self,record) :
     """
@@ -458,12 +462,16 @@ class Atom :
     Read a PDB HETATM or ATOM record
     """
     self.hetatm = record[0:6] == "HETATM"
-    self.serial = int(record[6:11].strip())
+    test = record[6:11].strip()
+    if test.find("*") > -1 :
+      self.serial = -1
+    else :
+      self.serial = int(record[6:11].strip())
     self.name = record[12:16]
     self.altloc = record[16]
     self.resname = record[17:20]
     self.chain = record[21]
-    self.residue = int(record[22:26].strip())
+    self.residue = int(record[22:27].strip())
     self.insertion = record[26]
     self.x = float(record[30:38].strip())
     self.y = float(record[38:46].strip())
