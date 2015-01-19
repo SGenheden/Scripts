@@ -66,6 +66,38 @@ std_aa_names["TYR"]="N H CA HA CB HB2 HB3 CG CD1 HD1 CE1 HE1 CZ OH HH CE2 HE2 CD
 std_aa_names["TRP"]="N H CA HA CB HB2 HB3 CG CD1 HD1 NE1 HE1 CE2 CZ2 HZ2 CH2 HH2 CZ3 HZ3 CE3 HE3 CD2 C O".split()
 std_aa_names["CYX"]="N H CA HA CB HB2 HB3 SG C O".split()
 
+def make_pdbres(coords,atom_names,res_name,pdbfile) :
+  """
+  Adds a residue + atoms to a PDBFile structure
+
+  Parameters
+  ----------
+  coords : Numpy array
+    the Cartesian coordinates
+  atom_names : list of strings
+    the atom names
+  res_name : string
+    the residue name
+  pdbfile : PDBFile object
+    the structure to add the residue to
+  """
+  res = Residue()   
+  for i,(coord,name) in enumerate(zip(coords,atom_names)) :
+    patom = Atom()
+    patom.idx = len(pdbfile.atoms)
+    patom.hetatm = False
+    patom.serial = len(pdbfile.atoms)+1
+    patom.name = name
+    patom.residue = len(pdbfile.residues)+1
+    patom.resname = res_name
+    patom.xyz = coord
+    patom.x = coord[0]
+    patom.y = coord[1]
+    patom.z = coord[2]
+    res.append(patom)
+    pdbfile.atoms.append(patom)
+  pdbfile.residues.append(res)
+
 class PDBFile :
   """
   A class to encapsulate atoms, residues and chains from a PDB-file
@@ -113,7 +145,7 @@ class PDBFile :
       self.residues.append(residue)
     self.__parse_chains()
     
-  def extend_residues(self,residues,makecopy=True) :
+  def extend_residues(self,residues,makecopy=True,dochains=True) :
     """
     Extend this structure with atoms and residues from a list of residues
     
@@ -123,6 +155,8 @@ class PDBFile :
       the residues to extend self with
     makecopy : boolean, optional
       if to make a copy of the residues or not
+    dochains : boolean, optional
+      if to make chains
     """
     for residue in residues :
       if makecopy :
@@ -131,7 +165,7 @@ class PDBFile :
         newres = residue
       self.residues.append(newres)
       for atom in newres.atoms : self.atoms.append(atom) 
-      self.__parse_chains()   
+      if dochains : self.__parse_chains()   
  
   def renumber(self,doatoms=True,doresidues=True) :
     """

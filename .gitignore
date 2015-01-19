@@ -52,3 +52,15 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
+
+acpype.py
+charge_corr_scripts/*
+Depracted/*
+Dgtools/*
+Dgtools2/*
+Gmx_test/*
+MDAnalysis/*
+Proj-fragments/*
+Proj-inla/*
+
+

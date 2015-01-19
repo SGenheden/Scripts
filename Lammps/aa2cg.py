@@ -26,30 +26,6 @@ oneup = os.path.split(thispath)[0]
 sys.path.insert(0,os.path.join(oneup,"Pdb"))
 import pdb
 
-
-def _make_pdbres(coords,atom_names,res_name,pdbfile) :
-  """
-  Adds a residue + atoms to a PDBFile structure
-  """
-  res = pdb.Residue()   
-  for i,(coord,name) in enumerate(zip(coords,atom_names)) :
-    patom = pdb.Atom()
-    patom.idx = len(pdbfile.atoms)
-    patom.hetatm = False
-    patom.serial = len(pdbfile.atoms)+1
-    patom.name = name
-    patom.residue = len(pdbfile.residues)+1
-    patom.resname = res_name
-    patom.x = coord[0]
-    try :
-      patom.y = coord[1]
-    except :
-      print res_name,len(pdbfile.atoms),coords,coord
-    patom.z = coord[2]
-    res.append(patom)
-    pdbfile.atoms.append(patom)
-  pdbfile.residues.append(res)
-
 def _ntypes(array) :
   """
   Find the number of types from a list (could be masses or connectivities)
@@ -93,6 +69,7 @@ if __name__ == '__main__' :
   parser.add_argument('-b','--box',type=float,nargs=3,help="the box dimensions",default=[0.0,0.0,0.0])
   parser.add_argument('-a','--atomistic',nargs="+",help="data file(s) for atomistic solutes",default=[])
   parser.add_argument('-c','--converter',help="the dictionary with conversion rules")
+  parser.add_argument('-p','--pairfunc',help="the pair function for the AA",default="lj/charmm/coul/long")
   args = parser.parse_args()
 
   # Load a converter
@@ -126,7 +103,7 @@ if __name__ == '__main__' :
     aa_datafiles[res] = lammps.Datafile(filename)
     # Extend the force field parameters
     # by extending the inclusion file, we will automatically update the parameter index
-    include.extend_from_data(aa_datafiles[res],lj_hybrid=[1,-1],lj_func=["lj/sf/dipole/sf","lj/charmm/coul/long"],ang_func="harmonic")
+    include.extend_from_data(aa_datafiles[res],lj_hybrid=[1,-1],lj_func=["lj/sf/dipole/sf",args.pairfunc],ang_func="harmonic")
     # Update the atom and conectivity parameters
     for atom in aa_datafiles[res].atoms : 
       atom.atype = atom.atype + natomtypes
@@ -147,7 +124,7 @@ if __name__ == '__main__' :
     if res2 in aa_datafiles :
       _generate_aa_residue(res,i+1-nwat,aa_datafiles[res2],data)
       coord = res.collect("xyz")
-      _make_pdbres(coord,[atom.name for atom in res.atoms],res2,pdbout)
+      pdb.make_pdbres(coord,[atom.name for atom in res.atoms],res2,pdbout)
       found = True
     # Otherwise convert it to CG
     else :
@@ -155,7 +132,7 @@ if __name__ == '__main__' :
         if residue.name == res2 :
           coord = residue.generate_cg(res,i+1,data)
           all_coords.extend(coord)
-          _make_pdbres(coord,residue.cg_names,res2,pdbout)
+          pdb.make_pdbres(coord,residue.cg_names,res2,pdbout)
           found = True
           break
     # If we could not find a conversion, we will convert the residue to a water bead
@@ -165,7 +142,7 @@ if __name__ == '__main__' :
           nwat = nwat + 1
           coord = residue.generate_cg(res,0,data)
           all_coords.extend(coord)
-          _make_pdbres(coord,residue.cg_names,"wat",pdbout)
+          pdb.make_pdbres(coord,residue.cg_names,"wat",pdbout)
   all_coords = np.array(all_coords)
 
   print "Minimum of coordinates = %.3f %.3f %.3f"%tuple(all_coords.min(axis=0))
