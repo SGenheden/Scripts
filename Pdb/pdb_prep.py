@@ -598,6 +598,8 @@ def _do_his(pdbfile,pid,user_sel) :
     logger.info("")
     logger.info("-- His%d --"%h.serial)
     f = open("his%d.pdb"%(i+1),"w")
+    f.write(h.__str__())
+    f.write("TER\n")
     cg  = None 
     nd1 = None
     ce1 = None
