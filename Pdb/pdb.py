@@ -145,7 +145,7 @@ class PDBFile :
       self.residues.append(residue)
     self.__parse_chains()
     
-  def extend_residues(self,residues,makecopy=True,dochains=True) :
+  def extend_residues(self,residues,makecopy=True,dochains=True,resnumber=None) :
     """
     Extend this structure with atoms and residues from a list of residues
     
@@ -157,14 +157,19 @@ class PDBFile :
       if to make a copy of the residues or not
     dochains : boolean, optional
       if to make chains
+    resnumber : list of integers, optional
+      the new residue numbers
     """
-    for residue in residues :
+    for i,residue in enumerate(residues,1) :
       if makecopy :
         newres = copy.deepcopy(residue)
       else :
         newres = residue
+      if resnumber is not None : newres.serial = resnumber[min(i,len(resnumber)-1)]
       self.residues.append(newres)
-      for atom in newres.atoms : self.atoms.append(atom) 
+      for atom in newres.atoms : 
+        self.atoms.append(atom) 
+        if resnumber is not None : atom.residue = resnumber[min(i,len(resnumber)-1)]
       if dochains : self.__parse_chains()   
  
   def renumber(self,doatoms=True,doresidues=True) :
@@ -216,6 +221,17 @@ class PDBFile :
       if not taken[chain[0]] : self.charged.append(self.residues[chain[0]])
       if not taken[chain[1]] : self.charged.append(self.residues[chain[1]])
     return self.charged
+    
+  def update_xyz(self,xyz) :
+     """
+     Update the Cartesian coordinates of all atoms
+     """
+     self.xyz = np.array(xyz,copy=True)
+     for atom,coord in zip(self.atoms,xyz) :
+       atom.x = coord[0]
+       atom.y = coord[1]
+       atom.z = coord[2]
+       atom.xyz = np.array(coord,copy=True)
 
   def read(self,filename,gro=False) :
     """

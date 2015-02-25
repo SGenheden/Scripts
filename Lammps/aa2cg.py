@@ -162,8 +162,9 @@ if __name__ == '__main__' :
     data.box = [-args.box[0]/2.0,-args.box[1]/2.0,-args.box[2]/2.0,args.box[0]/2.0,args.box[1]/2.0,args.box[2]/2.0]
 
   # Setting correct type for all atoms
-  for atom in data.atoms :
-    atom.kind = "cg/aa"
+  if args.atomistic :
+    for atom in data.atoms :
+      atom.kind = "cg/aa"
  
   # Setting box and adding connectivity to PDB-file
   pdbout.box = args.box
