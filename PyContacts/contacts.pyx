@@ -1,7 +1,11 @@
 # Author: Samuel Genheden
 
 """
-Cython routines to perform time series analysis
+Cython routines to perform contact analysis on state series
+
+The series are represented by an NxM NumpyArray of uint8
+where N is the number of records/points in the series
+and M is the number of items
 """
 
 from __future__ import division
@@ -74,7 +78,7 @@ def transition(np.ndarray[DTYPE_t, ndim=2] series, np.int nstates) :
   """
   Calculate the transition matrix of the series
   
-  There as M series and the length of the series is N. 
+  There are M series and the length of the series is N. 
   It should only contain integers from 0 to nstates, indicating the series state
   at a particular instance in time. 
   
@@ -116,3 +120,42 @@ def transition(np.ndarray[DTYPE_t, ndim=2] series, np.int nstates) :
 
   return M,Mcount
 
+def pairwise_contacts(np.ndarray[DTYPE_t, ndim=2] series) :
+  """
+  Calculate pairwise contact matrix of the series
+  
+  There as M series and the length of the series is N. 
+  It should only contain 0 and 1, indicating off and on. 
+  
+  Parameters
+  ----------
+  series : NxM numpy array
+    the time series 
+    
+  Returns
+  -------
+  MxM numpy array
+    the average pairwise contact number
+  """
+  cdef int nstep = series.shape[0]
+  cdef int nitems = series.shape[1]
+  cdef np.ndarray[DTYPE_f_t, ndim=2] M   = np.zeros((nitems,nitems),dtype=DTYPE_f)
+  
+  cdef int i,j,k
+  
+  for i in range(nstep) :
+    for j in range(nitems) :
+      if series[i,j] == 1 : 
+        M[j,j] = M[j,j] + 1
+        
+        for k in range(j+1,nitems) :
+          if series[i,k] == 1 :
+            M[j,k] = M[j,k] + 1 
+            
+  for j in range(nitems) :
+    M[j,j] = M[j,j] / float(nstep)
+    for k in range(j+1,nitems) :
+      M[j,k] = M[j,k] / float(nstep)
+      M[k,j] = M[j,k] 
+
+  return M
