@@ -108,7 +108,7 @@ if __name__ == '__main__' :
     for atom in aa_datafiles[res].atoms : 
       atom.atype = atom.atype + natomtypes
       atom.diameter = 0.0
-      atom.density = 1.0
+      atom.density = aa_datafiles[res].atomtypes[atom.atype - natomtypes - 1].mass
       atom.set_mu([0.0,0.0,0.0])
     conlist = [aa_datafiles[res].bonds,aa_datafiles[res].angles,aa_datafiles[res].dihedrals]
     for cons,ntypes in zip(conlist,contypes) :

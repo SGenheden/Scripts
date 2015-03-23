@@ -535,7 +535,7 @@ class Datafile :
       if not has_aa and self.atoms[-1].kind == "aa" :
         self.atoms[-1].kind = self.atoms[0].kind
         self.atoms[-1].diameter = 0.0
-        self.atoms[-1].density = 1.0
+        self.atoms[-1].density = copy.atomtypes[self.atoms[-1].atype-1-natomtypes].mass
         self.atoms[-1].set_mu([0.0,0.0,0.0])
     # Extend connectivity
     for b in copy.bonds :
@@ -694,7 +694,7 @@ class Datafile :
       else :
         list.sort(key=attrgetter("idx"))
 
-  def write(self,filename) :
+  def write(self,filename,writeparams=False) :
     """
     Write the atoms and connectivity to disc
 
@@ -719,6 +719,28 @@ class Datafile :
       f.write("%15.5f %15.5f ylo yhi\n"%(self.box[1],self.box[4]))
       f.write("%15.5f %15.5f zlo zhi\n"%(self.box[2],self.box[5]))
       f.write("\n")
+
+      if writeparams :
+        if len(self.atomtypes) > 0 and self.atomtypes[0] is not None :
+          f.write("Masses\n\n")
+          for a in self.atomtypes : f.write("%2d %10.5f %s\n"%(a.idx,a.mass,a.comment))
+          f.write("\n")
+          f.write("Pair Coeffs\n\n")
+          for a in self.atomtypes : f.write("%2d %s %10.5f %10.5f %s\n"%(a.idx,a.func,a.epsilon,a.sigma,a.comment))
+          f.write("\n")
+        if len(self.bondtypes) > 0 and self.bondtypes[0] is not None :
+          f.write("Bond Coeffs\n\n")
+          for c in self.bondtypes : f.write("%s\n"%c.__str__())
+          f.write("\n")
+        if len(self.angletypes) > 0 and self.angletypes[0] is not None :
+          f.write("Angle Coeffs\n\n")
+          for c in self.angletypes : f.write("%s\n"%c.__str__())
+          f.write("\n")
+        if len(self.dihedraltypes) > 0 and self.dihedraltypes[0] is not None :
+          f.write("Dihedral Coeffs\n\n")
+          for c in self.dihedraltypes : f.write("%s\n"%c.__str__())
+          f.write("\n")
+
       f.write("Atoms\n\n")
       for atm in self.atoms :
         f.write("%s\n"%atm.__str__())
