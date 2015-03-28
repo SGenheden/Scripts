@@ -3,7 +3,7 @@
 """
 Classes and routines to read, write and manipulate LAMMPS files
 
-Note that only a sub-set of the versatile datafile and inclusion
+Note that only a sub-set of the versatile datafile and include
 file can be read, written and manipulated.
 
 The selection has been made on a need-basis to handle ELBA force field
@@ -52,6 +52,35 @@ def parse_molecules(data,order=False) :
     return molecules,mollist
   else :
     return molecules
+
+def comp_pair(p1,p2) :
+  def comp_atoms(p1,p2) :    
+    if p1.iatom < p2.iatom :
+      return -1
+    elif p1.iatom > p2.iatom :
+      return 1
+    else :
+      if p1.jatom < p2.jatom :
+        return -1
+      elif p1.jatom > p2.jatom :
+        return 1      
+      else :
+        return 0  
+  elba_func = "lj/sf/dipole/sf"
+  if p1.func == elba_func  and p2.func != elba_func :
+    return -1
+  elif p1.func != elba_func  and p2.func == elba_func :
+    return 1
+  else :
+    if p1.hybrid > -1 :
+      if p1.hybrid < p2.hybrid :
+        return 1
+      elif p1.hybrid > p2.hybrid :
+        return -1
+      else :
+        return comp_atoms(p1,p2)
+    else :
+      return comp_atoms(p1,p2)
 
 class Atom :
   """
@@ -403,9 +432,9 @@ class PairParam :
         str14 = " %15.10f %15.10f"%(self.epsilon14,self.sigma14)
     
     if self.hybrid > -1 :
-      return "pair_coeff %2d %2d %-20s %2d %15.3f %15.3f%s %s"%(self.iatom,self.jatom,self.func,self.hybrid,self.epsilon,self.sigma,str14,self.comment)
+      return "%2d %2d %-20s %2d %15.3f %15.3f%s %s"%(self.iatom,self.jatom,self.func,self.hybrid,self.epsilon,self.sigma,str14,self.comment)
     else :
-      return "pair_coeff %2d %2d %-20s %2s %15.3f %15.3f%s %s"%(self.iatom,self.jatom,self.func,"",self.epsilon,self.sigma,str14,self.comment)
+      return "%2d %2d %-20s %2s %15.3f %15.3f%s %s"%(self.iatom,self.jatom,self.func,"",self.epsilon,self.sigma,str14,self.comment)
 
 class ConnectivityParam :
   """
@@ -608,8 +637,8 @@ class Datafile :
 
         elif line.find("PairIJ Coeffs") > -1 :
           line = f.readline() # Dummy line
-          line = f.readline() 
-          while len(line) > 4 and line[0].isdigit() :
+          line = f.readline()
+          while len(line) > 4 and line.strip()[0].isdigit() :
             self.pairtypes.append(PairParam(record=line))
             line = f.readline()
           continue
@@ -725,9 +754,14 @@ class Datafile :
           f.write("Masses\n\n")
           for a in self.atomtypes : f.write("%2d %10.5f %s\n"%(a.idx,a.mass,a.comment))
           f.write("\n")
-          f.write("Pair Coeffs\n\n")
-          for a in self.atomtypes : f.write("%2d %s %10.5f %10.5f %s\n"%(a.idx,a.func,a.epsilon,a.sigma,a.comment))
-          f.write("\n")
+          if self.atomtypes[0].sigma is not None :
+            f.write("Pair Coeffs\n\n")
+            for a in self.atomtypes : f.write("%2d %s %10.5f %10.5f %s\n"%(a.idx,a.func,a.epsilon,a.sigma,a.comment))
+            f.write("\n")
+          if len(self.pairtypes) > 0 :
+            f.write("PairIJ Coeffs\n\n")
+            for p in self.pairtypes : f.write("%s\n"%p.__str__())
+            f.write("\n")
         if len(self.bondtypes) > 0 and self.bondtypes[0] is not None :
           f.write("Bond Coeffs\n\n")
           for c in self.bondtypes : f.write("%s\n"%c.__str__())
@@ -793,21 +827,26 @@ class Includefile() :
     newmass.idx = len(self.masses)+1
     new_paircoeff = []
     for paircoeff in self.pair_coeff :
-      if paircoeff.iatom == atype or paircoeff.jatom == atype :    
+      if atype in [paircoeff.iatom , paircoeff.jatom] :    
         newpair = copy.deepcopy(paircoeff)
         if newpair.comment == "" : newpair.comment = "#"
         newpair.comment = newpair.comment + " copy of %d,%d"%(newpair.iatom,newpair.jatom)
         if paircoeff.iatom == atype :
           newpair.iatom = len(self.masses)+1
-        elif paircoeff.jatom == atype :
+        if paircoeff.jatom == atype :
           newpair.jatom = len(self.masses)+1
         if newpair.jatom < newpair.iatom :
           temp = newpair.jatom
           newpair.jatom = newpair.iatom
           newpair.iatom = temp
         new_paircoeff.append(newpair)
+        if paircoeff.iatom == paircoeff.jatom :
+          newpair = copy.deepcopy(paircoeff) 
+          newpair.comment += " copy of %d,%d"%(newpair.iatom,newpair.jatom)
+          newpair.jatom = len(self.masses)+1
+          new_paircoeff.append(newpair)
     return (newmass,new_paircoeff)
-  def extend(self,copy,lj_hybrid=-1,lj_func="",ang_func=None) :
+  def extend(self,copy,lj_hybrid=-1,lj_func="",ang_func=None,dih_func=None) :
     """
     Extend with another Include file
 
@@ -822,7 +861,9 @@ class Includefile() :
     lj_func : string 
       the function for the pair coefficient
     ang_func : string, optional
-      the function for the angle parameters      
+      the function for the angle parameters   
+    dih_func : string, optional
+      the function for the dihedral parameters   
     """
     natomtypes = 0
     for m in self.masses : natomtypes = max(natomtypes,m.idx)
@@ -850,10 +891,10 @@ class Includefile() :
     # Add new connectivity params
     self.__extend_con(self.bondparams,copy.bondparams)
     self.__extend_con(self.angleparams,copy.angleparams,func=ang_func)
-    self.__extend_con(self.dihedralparams,copy.dihedralparams)
+    self.__extend_con(self.dihedralparams,copy.dihedralparams,func=dih_func)
     self.__extend_con(self.improperparams,copy.improperparams)
 
-  def extend_from_data(self,copy,lj_hybrid=None,lj_func=None,ang_func=None) :
+  def extend_from_data(self,copy,lj_hybrid=None,lj_func=None,lj_hybrid_mix=None,lj_func_mix=None,ang_func=None,dih_func=None) :
     """
     Extend with another Datafile
 
@@ -863,14 +904,18 @@ class Includefile() :
     ----------
     copy : Includefile object
       the include file to append to this
-    lj_hybrid : list of int, optional
-      the hybrid flag for the pair coefficient
-      the first flag is used for the pairs in the Datafile
-      the second flag is used for the mixed pairs
-    lj_func : list of string , optional
-      the function for the pair coefficient
+    lj_hybrid : int, optional
+      the hybrid flag for the pair coefficients in the Datafile
+    lj_func : string , optional
+      the function for the pair coefficients in the Datafile
+    lj_hybrid_mix : dictionary, optional
+      the hybrid flag for the pair coefficients when mixing them
+    lj_func : dictionary, optional
+      the function for the pair coefficients when mixing them
     ang_func : string, optional
-      the function for the angle parameters      
+      the function for the angle parameters 
+    dih_func : string, optional
+      the function for the dihedral parameters      
     """
     natomtypes = 0
     for m in self.masses : natomtypes = max(natomtypes,m.idx)
@@ -886,14 +931,14 @@ class Includefile() :
         self.pair_coeff.append(PairParam())
         self.pair_coeff[-1].iatom = i_lj.iatom
         self.pair_coeff[-1].jatom = j_lj.idx
-        if lj_hybrid == None :
+        if lj_hybrid_mix == None :
           self.pair_coeff[-1].hybrid = -1
         else :
-          self.pair_coeff[-1].hybrid = lj_hybrid[0]
-        if lj_func == None :
+          self.pair_coeff[-1].hybrid = lj_hybrid_mix[i_lj.func]
+        if lj_func_mix == None :
           self.pair_coeff[-1].func = ""
         else :
-          self.pair_coeff[-1].func = lj_func[0]
+          self.pair_coeff[-1].func = lj_func_mix[i_lj.func]
         self.pair_coeff[-1].comment = "# Mixed using Lorentz-Berthelot rules"
         self.pair_coeff[-1].epsilon = np.sqrt(i_lj.epsilon*j_lj.epsilon)
         self.pair_coeff[-1].sigma = (i_lj.sigma+j_lj.sigma)/2.0     
@@ -908,11 +953,11 @@ class Includefile() :
           if lj_hybrid == None :
             self.pair_coeff[-1].hybrid = -1
           else :
-            self.pair_coeff[-1].hybrid = lj_hybrid[1]
+            self.pair_coeff[-1].hybrid = lj_hybrid
           if lj_func == None :
             self.pair_coeff[-1].func = ""
           elif self.pair_coeff[-1] != "" :
-            self.pair_coeff[-1].func = lj_func[1]
+            self.pair_coeff[-1].func = lj_func
           self.pair_coeff[-1].comment = "# From Datafile, Mixed using Lorentz-Berthelot rules"
           self.pair_coeff[-1].epsilon = np.sqrt(i_lj.epsilon*j_lj.epsilon)
           self.pair_coeff[-1].sigma = (i_lj.sigma+j_lj.sigma)/2.0
@@ -924,15 +969,15 @@ class Includefile() :
         if lj_hybrid == None :
           self.pair_coeff[-1].hybrid = -1
         else :
-          self.pair_coeff[-1].hybrid = lj_hybrid[1]
+          self.pair_coeff[-1].hybrid = lj_hybrid
         if lj_func == None :
           self.pair_coeff[-1].func = ""
         else :
-          self.pair_coeff[-1].func = lj_func[1]        
+          self.pair_coeff[-1].func = lj_func       
     # Add new connectivity params
     self.__extend_con(self.bondparams,copy.bondtypes)
     self.__extend_con(self.angleparams,copy.angletypes,func=ang_func)
-    self.__extend_con(self.dihedralparams,copy.dihedraltypes)  
+    self.__extend_con(self.dihedralparams,copy.dihedraltypes,func=dih_func)  
     self.__extend_con(self.improperparams,copy.impropertypes)         
   def read(self,filename) :
     """
@@ -960,7 +1005,7 @@ class Includefile() :
     for m in self.masses : f.write("mass %2d %10.5f %s\n"%(m.idx,m.mass,m.comment))
     f.write("\n# Lennard-Jones coefficients\n")
     f.write("#          %2s %2s %-20s %2s %15s %15s\n"%("i","j","(style)","(hy)","epsilon","sigma"))
-    for pair in self.pair_coeff : f.write("%s\n"%pair.__str__())
+    for pair in self.pair_coeff : f.write("pair_coeff %s\n"%pair.__str__())
     f.write("\n# Bond coefficients\n")
     f.write("#           type params\n")
     for bnd in self.bondparams : f.write("bond_coeff %s\n"%bnd.__str__())

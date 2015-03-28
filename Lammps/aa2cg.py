@@ -5,7 +5,7 @@ Program to build a CG or AA/CG dual-resolution
 system from an AA system. Converts AA residues
 automatically to CG using dictionary of conversions.
 
-Writes out LAMMPS datafiles and inclusion file
+Writes out LAMMPS datafiles and include file
 for the force field, as well as a PDB-file.
 """
 
