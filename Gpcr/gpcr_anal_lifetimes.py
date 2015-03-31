@@ -26,9 +26,8 @@ import argparse
 
 import numpy as np
 
+import pycontacts
 import gpcr_lib
-sys.path.append("/home/sg6e12/Programs/")
-import lifetime_anal
 
 SEP = "\n"+" "*18
 
@@ -91,7 +90,7 @@ def _anal_lifetimes(files,labels,helical,mol,time) :
       states.append(gpcr_lib.logical_expr(filename.replace(" ",""),*states))
 
   # Conversion factor from snapshot lifetime to ns lifetime
-  ns_per_snapshot = args.time / float(states[0].shape[0])
+  ns_per_snapshot = time / float(states[0].shape[0])
 
   # Perform helical transformation     
   if helical is not None :
@@ -100,7 +99,7 @@ def _anal_lifetimes(files,labels,helical,mol,time) :
      
   # Concatenate all state matrices and do lifetime analysis
   all_states = np.concatenate(states,axis=1)
-  life_av,life_max = lifetime_anal.lifetime(all_states)   
+  life_av,life_max = pycontacts.lifetime(all_states)   
         
   # Write out statistics
   print "%15s\t%8s\t%8s"%("","Median","Max")

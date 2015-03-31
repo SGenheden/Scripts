@@ -63,11 +63,12 @@ if __name__ == '__main__' :
   parser.add_argument('-x','--xtc',help="the xtc file.",default="")
   parser.add_argument('-s','--struct',help="a structure file",default="r1_md2_fit.gro")
   parser.add_argument('-p','--prefix',help="an output prefix",default="")
-  parser.add_argument('-a','--analysis',nargs="+",choices=["density","counting","thickness","order","savemol","contacts","lipidcontacts","buried"],help="what analysis do to",default=[])
+  parser.add_argument('-a','--analysis',nargs="+",choices=["density","counting","joint","thickness","order","savemol","contacts","lipidcontacts","buried"],help="what analysis do to",default=[])
   parser.add_argument('-t','--time',type=int,help="ps per snapshot",default=20)
   parser.add_argument('-b','--box',type=int,choices=[52,35],help="the truncated box size",default=35)
   parser.add_argument('-c','--cutoff',type=float,help="contact cut-off",default=6.0)
   parser.add_argument('-bc','--bcutoff',type=float,help="buried cut-off",default=8.0)
+  parser.add_argument('--skip',type=int,help="skip every")
   args = parser.parse_args()
   
   do_density = "density" in args.analysis
@@ -78,6 +79,7 @@ if __name__ == '__main__' :
   do_contacts = "contacts" in args.analysis
   do_lipidcontacts = "lipidcontacts" in args.analysis
   do_countburied = "buried" in args.analysis
+  do_joint = "joint" in args.analysis
   print "Doing %s analysis"%", ".join(args.analysis)
   
   # Make output filenames
@@ -185,6 +187,12 @@ if __name__ == '__main__' :
     ohresfile = open(prefix+"_chol-oh.resstate.%.0f.dat"%(args.cutoff),"wb")
     ohburresfile = open(prefix+"_chol-oh.buried.rstate.%.0f.dat"%(args.cutoff),"wb")
     
+  if do_joint and len(chols) > 0 :
+    jointcom = np.zeros([len(residues),len(residues)])
+    jointcomburr = np.zeros([len(residues),len(residues)])
+    jointoh = np.zeros([len(residues),len(residues)])
+    jointohburr = np.zeros([len(residues),len(residues)])
+
   # Allocate matrices for buried analysis
   if do_countburied :
     buried_depth = [2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,12.0]
@@ -194,8 +202,11 @@ if __name__ == '__main__' :
   # Main loop
   #
   nfiles=1
+  nsnap = 0
   for ti,ts in enumerate(universe.trajectory) :
- 
+    if args.skip is not None and (ti % args.skip == 0) : continue   
+    nsnap += 1
+
     # Calculates some properties important for many analysis 
     box = ts.dimensions[:3]
     # This is taken as a the middle of the bilayer
@@ -231,6 +242,9 @@ if __name__ == '__main__' :
       if do_contacts :
         gpcr_lib.anal_contacts(prot,rfirst,chol_cent,args.cutoff,midz,box,cholmolfile,cholresfile,cholburresfile,buried)
         gpcr_lib.anal_contacts(prot,rfirst,hydroxyl.get_positions(),args.cutoff,midz,box,ohmolfile,ohresfile,ohburresfile,buried)
+      if do_joint :
+        jointcom,jointcomburr = gpcr_lib.anal_jointdist(prot,rfirst,chol_cent,args.cutoff,midz,box,jointcom,jointcomburr,buried)
+        jointoh,jointohburr = gpcr_lib.anal_jointdist(prot,rfirst,hydroxyl.get_positions(),args.cutoff,midz,box,jointoh,jointohburr,buried)
     else :
       chol_cent = None   
       buried = None  
@@ -263,7 +277,7 @@ if __name__ == '__main__' :
       contact_short = gpcr_lib.anal_contacts(prot,rfirst,short_chain_cent,args.cutoff,midz,box,shortmolfile,shortresfile)
       contact_long = gpcr_lib.anal_contacts(prot,rfirst,long_chain_cent,args.cutoff,midz,box,longmolfile,longresfile)
       
-    if ti % 10000 == 0: 
+    if ti % 10001 == 0: 
       print "%d"%ti,
       sys.stdout.flush()
       
@@ -290,31 +304,35 @@ if __name__ == '__main__' :
   if do_contacts and len(chols) > 0:
     cholmolfile.close()
     cholresfile.close()
-    cholleaffile.close()      
     cholburresfile.close()
     ohmolfile.close()
     ohresfile.close()
-    ohleaffile.close()      
-    ohresfile.close()
+    ohburresfile.close()
 
   if do_lipidcontacts :
     shortmolfile.close()
     shortresfile.close()
-    shortleaffile.close()
     longmolfile.close()
     longresfile.close()
   
+  if do_joint :
+    jointcom = jointcom / float(nsnap)
+    jointcomburr = jointcomburr / float(nsnap)
+    jointoh = jointoh / float(nsnap)
+    jointohburr = jointohburr / float(nsnap)
+    np.savez(prefix+"_joint.%.0f.npz"%args.cutoff,jointcom=jointcom,jointcomburr=jointcomburr,jointoh=jointoh,jointohburr=jointohburr)
+
   if do_counting :
     lipleaffile.close()
     if len(chols) > 0 :
       cholmidfile.close()
       cholleaffile.close()
-      print "\nAverage number of cholesterols, lower=%.3f, upper=%.3f"%(cholcount_low/float(ti+1),cholcount_upp/float(ti+1)) 
-      print "Average number of cholesterols (excluding buried), lower=%.3f, upper=%.3f"%(cholcount_low2/float(ti+1),cholcount_upp2/float(ti+1)) 
+      print "\nAverage number of cholesterols, lower=%.3f, upper=%.3f"%(cholcount_low/float(nsnap+1),cholcount_upp/float(nsnap+1)) 
+      print "Average number of cholesterols (excluding buried), lower=%.3f, upper=%.3f"%(cholcount_low2/float(nsnap+1),cholcount_upp2/float(nsnap+1)) 
       if do_countburied :
           for i,depth in enumerate(buried_depth)  :
-            print "Average number of cholesterols at depth %.2f = %.3f"%(depth,nburied[i]/float(ti+1)) 
+            print "Average number of cholesterols at depth %.2f = %.3f"%(depth,nburied[i]/float(nsnap+1)) 
 
-  print ti+1
+  print nsnap
       
  

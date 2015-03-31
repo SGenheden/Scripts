@@ -278,6 +278,71 @@ def anal_density(low_sel,count,grid,mat,buried=None,**kwargs) :
     if buried is not None :
       midx = v[:,buried]
       mat["mid_"+k][midx[0],midx[1]] = mat["mid_"+k][midx[0],midx[1]] + 1
+
+def anal_jointdist(prot,rfirst,mols,cutoff,midz,box,mat,matburr,buried=None) :
+  """
+  Calculates the joint probability of residue interactions
+  
+  Parameters
+  ----------
+  prot : AtomSelection
+    the protein atoms
+  rfirst : NumpyArray
+    the first atom of each residue in the protein
+  mols : NumpyArray
+    the centroid of the molecule of interest
+  cutoff : float
+    the contact cut-off
+  midz : float
+    the middle of the bilayer
+  box : NumpyArray
+    the box sides
+  mat : NumpyArray
+    the joint probability for non-buried molecules
+  matburr : NumpyArray
+    the joint probability for buried molecules
+  buried : NumpyArray of boolean, optional
+    flag to indicate buried molecule
+  """  
+  imat = np.zeros(mat.shape)
+  imatburr = np.zeros(matburr.shape)
+  
+  # Calculate all distances at once
+  if box is not None :
+    dist_all = distances.distance_array(np.array(mols), prot.get_positions(), box)
+  else :
+    CNS = CoordinateNeighborSearch(prot.get_positions())
+  
+  # Loop over all molecules
+  for mi,mol in enumerate(mols) :   
+    if box is not None :
+      dist = dist_all[mi,:]
+    else :
+      dist = np.ones(prot.get_positions().shape[0])+cutoff
+      for i in CNS.search_list(np.array([mol]),cutoff) : dist[i] = 0.0 
+    
+    # Check if this molecule is on
+    if dist.min() >= cutoff : continue
+
+    # Check contacts for reach residue
+    for i in range(len(rfirst)-1) :
+      if dist[rfirst[i]:rfirst[i+1]].min() >= cutoff : continue
+      if (buried is not None and buried[mi]) : 
+        imatburr[i,i] = 1  
+      else :
+        imat[i,i] = 1  
+      
+      for j in range(i+1,len(rfirst)-1) :
+        if dist[rfirst[j]:rfirst[j+1]].min() >= cutoff : continue
+
+        if (buried is not None and buried[mi]) : 
+          imatburr[i,j] = 1  
+          imatburr[j,i] = 1  
+        else :
+          imat[i,j] = 1  
+          imat[j,i] = 1  
+
+  return (mat+imat,matburr+imatburr)
       
 def anal_orderparams(heads,head_idx,midz,bonds,mat) :
   """
@@ -429,7 +494,7 @@ class Density :
       self.nsnap = np.zeros(nfiles)
       self.nsnap[0] = kwargs["nsnap"]
     else :
-      self.nsnap
+      self.nsnap = 1
     if "molcount" in kwargs :
       self.molcount = np.zeros(nfiles)
       self.molcount[0] = kwargs["molcount"]
@@ -738,19 +803,20 @@ class XrayDensity :
     cholxyz = []
     protxyz = []
     protflag = []
-    pdbfile = pdb.PDBFile(filename)
+    self.pdbfile = pdb.PDBFile(filename)
     flag = {"BB" : 1, "SC" :-1}
-    for atom in pdbfile.atoms : 
+    for atom in self.pdbfile.atoms : 
       if atom.resname[0:3] == "CHO" :
         cholxyz.append(atom.xyz)
       elif atom.name.strip()[:2] in ["BB","SC"] :
         protflag.append(flag[atom.name.strip()[:2]])
         protxyz.append(atom.xyz)
-    self.box = pdbfile.box
+    self.box = self.pdbfile.box
     self.cholxyz = np.array(cholxyz)
     self.protxyz = np.array(protxyz)
     self.protflag  = np.array(protflag,dtype=int)
     self.helices  = template.helices
+    self.template = template
  
     # Optionally, read a file of Lennard-Jones sigma parameters
     if sigmafile is None :
@@ -833,15 +899,54 @@ class XrayDensity :
       if reverseY : fac = 1
       axis.plot(fac*(-self.cholxyz[::2,1]+centy*grid.resolution),self.cholxyz[::2,0]-centx*grid.resolution,'xk')
 
-def draw_colormap(figure,image) :
+def draw_colormap(figure,image,text=r'$\ln[\rho/\rho_0]$') :
   """
   Draw a colorbar associated with an image
   """
   cax = figure.add_axes([ 0.08,0.0, 1,1])
-  cax.text(1.03,0.77,r'$\ln[\rho/\rho_0]$')
+  cax.text(1.03,0.77,text)
   hide_axis(cax)
   figure.colorbar(image,orientation='vertical',ax=cax,shrink=0.5,aspect=50)  
+
+def draw_joint2d(axis,residues0,residues,contacts,logit=False) :
+  """
+  Draw a residue-residue contact joint probability plot as a contour
   
+  Parameters
+  ----------
+  axis : Axis object
+    the axis to draw on
+  residues0 : numpy array
+    the tick positions of the residues
+  residues : numpy array
+    the x-ray number of the residues
+  contacts : numpy array
+    the contact probabilities
+  logit : boolean, optional
+    if to plot log probabilities
+  """
+  
+  sel = contacts>0
+  if logit :
+    logcont = np.zeros(contacts.shape)
+    logcont[sel] = np.log(contacts[sel])
+    C = axis.imshow(logcont,cmap=plt.cm.BuGn,origin="lower",interpolation="none")
+  else :
+    C = axis.imshow(contacts,cmap=plt.cm.BuGn,origin="lower",interpolation="none")
+  excluded_im = np.ones([contacts.shape[0],contacts.shape[1],4])
+  excluded_im[sel,3] = 0.0
+  axis.imshow(excluded_im,origin="lower")
+  
+  sel = residues > 0
+  axis.set_xticks(residues0[sel][::20])
+  axis.set_yticks(residues0[sel][::20])
+  axis.set_xticklabels(residues[sel][::20])
+  axis.set_yticklabels(residues[sel][::20])
+  axis.set_xlabel("Residue")
+  axis.set_ylabel("Residue")
+  
+  return C
+
 def hide_axis(axis) :
   """
   Hide the axes and frame of matplotlib axis object
@@ -851,7 +956,7 @@ def hide_axis(axis) :
   axis.patch.set_alpha(0)
   axis.set_frame_on(False)
   
-def plot_density_xray(axis,density,mat,minval,maxval,xray,leaflet,label,number=None,plotn=True) :
+def plot_density_xray(axis,density,mat,minval,maxval,xray,leaflet,label,number=None,plotn=True,drawchol=True) :
   """
   Utility function to plot both density and x-ray structure
   
@@ -877,14 +982,24 @@ def plot_density_xray(axis,density,mat,minval,maxval,xray,leaflet,label,number=N
     a number string to draw to identify this plot with, e.g. A), B)
   plotn : boolean, optional
     if to draw the average number of molecules on the density
-    
+  drawchol : boolean, optional
+      if to draw cholesterols if they exists
+          
   Returns
   -------
   Image :
     the Image of the density that was plotted, for adding colormap
   """
+  if density is None :
+    density = Density(np.zeros([70,70]),2)
+    density.append(np.zeros([70,70]))
+    density.average()
+    mat = "average"
+    minval = -1000
+    maxval = 1000
+    
   im = density.plot(mat,axis,plt.cm.RdYlBu_r,minval,maxval=maxval,reverseY=leaflet=="upp")
-  xray.plot(axis,leaflet,reverseY=leaflet=="upp")
+  xray.plot(axis,leaflet,reverseY=leaflet=="upp",drawchol=drawchol)
   axis.set_xlim((-35,35))
   axis.set_ylim((-35,35))
   axis.text(-28,28,label,size=14)     
@@ -906,14 +1021,20 @@ def load_template(mol) :
   else :
     raise Exception("Invalid mol (%s) or file is missing (%s)"%(mol,filename))
 
-def load_xray(mol) :
+def load_xray(mol,loadsigma=False) :
   """
   Load an XrayDensity object from a standard location
   """
   template = load_template(mol)
   filename = os.path.join(PROT_INFO_PATH,"xray_%s.gro"%mol)
   if os.path.isfile(filename) :
-    return XrayDensity(filename,template)
+    sigmafile = None
+    # Optionally give the sigma file
+    if loadsigma :
+      sigmafile = os.path.join(PROT_INFO_PATH,"sigmas_%s"%mol)
+      if not os.path.isfile(sigmafile) : sigmafile = None
+      
+    return XrayDensity(filename,template,sigmafile)
   else :
     raise Exception("File is missing (%s)"%filename)
 

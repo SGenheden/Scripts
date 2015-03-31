@@ -19,13 +19,26 @@ analyse cholesterols in the upper leaflet.
 """
 
 import os
+import sys
 import argparse
 
 import numpy as np
+import matplotlib
+if not "DISPLAY" in os.environ or os.environ["DISPLAY"] == "" :
+  matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 import gpcr_lib
+thispath = os.path.dirname(os.path.abspath(__file__))
+oneup = os.path.split(thispath)[0]
+sys.path.insert(0,os.path.join(oneup,"Plot"))
+import colors
 
-def _anal_contacts(filenames,labels) :
+def moving(data,window) :
+  weights = np.repeat(1.0,window) / float(window)
+  return np.convolve(data,weights,'valid')
+
+def _anal_contacts(filenames,labels,plot=[],time=None,window=None) :
   """
   Main analysis routine
   
@@ -35,7 +48,13 @@ def _anal_contacts(filenames,labels) :
     the files to read and analyse
   labels : list of strings
     the labels for the files
-
+  plot : list of integers, optional
+    the series to plot
+  time : float, optional
+    the total simulation time
+  window : float, optional
+    the window time for averaging
+    
   Returns
   -------
   list of numpy array
@@ -53,10 +72,21 @@ def _anal_contacts(filenames,labels) :
   # Count the number of on states and write out statistics      
   print "%18s\t%8s\t%8s"%("","Mean","Std")
   results = []
-  for state,label in zip(states,labels) : 
+  for i,(state,label) in enumerate(zip(states,labels),1) : 
     counton = state.sum(axis=1)
     print "%-18s\t%8.3f\t%8.3f"%(label,counton.mean(),counton.std())  
     results.append(np.array([counton.mean(),counton.std()]))
+    
+    if len(plot) > 0 and time is not None and i in plot :
+      ns_per_snapshot = time / float(counton.shape[0])
+      snapshot_per_window = window / ns_per_snapshot
+      series = moving(counton,snapshot_per_window)
+      f = plt.figure(i)
+      x = np.arange(series.shape[0])*ns_per_snapshot
+      f.gca().plot(x,series,color=colors.color(plot.index(i)))
+      f.gca().set_xlabel("Time (ns)")
+      f.gca().set_ylabel(label)
+      f.savefig("series%d.png"%(i),format="png",dpi=300)
     
   return results
 
@@ -67,9 +97,12 @@ if __name__ == '__main__' :
   parser.add_argument('-f','--files',nargs='+',help="a list of input files.",default=[])
   parser.add_argument('-l','--labels',nargs='+',help="a label for each state.",default=[])
   parser.add_argument('--repeats',nargs="+",help="replacement pattern for multiple repeats",default=["r1_","r2_","r3_","r4_","r5_"]) 
+  parser.add_argument('--time',type=float,help="total simulation time in ns",default=50000) 
+  parser.add_argument('--window',type=float,help="the window time in ns",default=50) 
+  parser.add_argument('--plot',type=int,nargs="+",help="which series to plot",default=[])
   args = parser.parse_args()
   
-  res0 = _anal_contacts(args.files,args.labels)
+  res0 = _anal_contacts(args.files,args.labels,args.plot,args.time,args.window)
   
   if args.repeats is not None :
     # Create arrays for average calculations

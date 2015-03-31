@@ -147,11 +147,11 @@ if __name__ == '__main__' :
   # Middle leaflet
   if densities1.mid is not None or densities2.mid is not None :
     fig_mid = plt.figure(3)
-    for i,(dxi,si,label,number) in enumerate(zip([0,0,1,1],[0,1,0,1],labels[4:],["A)","B)","C)","D)"]),1) :
+    for i,(dxi,si,label,number) in enumerate(zip([0,0,1,1],[0,1,0,1],labels[4:],["A)","B)","C)","D)","E)","F)"]),1) :
       if densities[dxi].mid is not None :
         a = fig_mid.add_subplot(2,2,i)
-        im = gpcr_lib.plot_density_xray(a,densities[dxi].mid,args.plot,minval,maxval,xray[dxi],sides[si],label,number=number,plotn=False)
-    gpcr_lib.draw_colormap(fig_both,im) 
+        im = gpcr_lib.plot_density_xray(a,densities[dxi].mid,args.plot,minval,maxval,xray[dxi],sides[si],label,number=number,plotn=False,drawchol=False)
+    gpcr_lib.draw_colormap(fig_mid,im,text=r'$\ln[\rho/2\rho_0]$') 
     fig_mid.savefig(args.out+"_mid.png",format="png")  
 
   # Difference
