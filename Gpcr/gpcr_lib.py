@@ -817,6 +817,13 @@ class XrayDensity :
     self.protflag  = np.array(protflag,dtype=int)
     self.helices  = template.helices
     self.template = template
+
+    self.cholleaf = ""
+    if self.cholxyz.shape[0] > 0 :
+       if self.cholxyz.mean(axis=0)[2] < self.protxyz.mean(axis=0)[2] :
+         self.cholleaf = "low"
+       else :
+         self.cholleaf = "upp"
  
     # Optionally, read a file of Lennard-Jones sigma parameters
     if sigmafile is None :
@@ -894,7 +901,7 @@ class XrayDensity :
       axis.text(fac*pnt[1],pnt[0],"H%d"%(i+1),bbox=dict(facecolor='white',alpha=0.9),color=colors.color(i),fontsize=10)
 
     # Write out cholesterols
-    if drawchol and leaflet[0:3] == "low" and self.cholxyz != None and self.cholxyz.shape[0] > 0 :
+    if drawchol and leaflet[0:3] == self.cholleaf and self.cholxyz != None and self.cholxyz.shape[0] > 0 :
       fac = -1
       if reverseY : fac = 1
       axis.plot(fac*(-self.cholxyz[::2,1]+centy*grid.resolution),self.cholxyz[::2,0]-centx*grid.resolution,'xk')
@@ -906,7 +913,8 @@ def draw_colormap(figure,image,text=r'$\ln[\rho/\rho_0]$') :
   cax = figure.add_axes([ 0.08,0.0, 1,1])
   cax.text(1.03,0.77,text)
   hide_axis(cax)
-  figure.colorbar(image,orientation='vertical',ax=cax,shrink=0.5,aspect=50)  
+  figure.colorbar(image,orientation='vertical',ax=cax,shrink=0.5,aspect=50) 
+  return cax 
 
 def draw_joint2d(axis,residues0,residues,contacts,logit=False) :
   """
@@ -990,7 +998,7 @@ def plot_density_xray(axis,density,mat,minval,maxval,xray,leaflet,label,number=N
   Image :
     the Image of the density that was plotted, for adding colormap
   """
-  if density is None :
+  if density == 0 :
     density = Density(np.zeros([70,70]),2)
     density.append(np.zeros([70,70]))
     density.average()
@@ -998,7 +1006,11 @@ def plot_density_xray(axis,density,mat,minval,maxval,xray,leaflet,label,number=N
     minval = -1000
     maxval = 1000
     
-  im = density.plot(mat,axis,plt.cm.RdYlBu_r,minval,maxval=maxval,reverseY=leaflet=="upp")
+  if density is not None : 
+    im = density.plot(mat,axis,plt.cm.RdYlBu_r,minval,maxval=maxval,reverseY=leaflet=="upp")
+  else :
+    im = None
+
   xray.plot(axis,leaflet,reverseY=leaflet=="upp",drawchol=drawchol)
   axis.set_xlim((-35,35))
   axis.set_ylim((-35,35))

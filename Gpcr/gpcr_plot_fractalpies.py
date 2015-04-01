@@ -161,8 +161,8 @@ class StructurePartition :
   
     if self.fractal_low is None : return
 
-    gpcr_lib.plot_density_xray(axes[0],None,"",0,0,self.xray,"low","Intra.",number=None,plotn=False,drawchol=False)
-    gpcr_lib.plot_density_xray(axes[1],None,"",0,0,self.xray,"upp","Extra.",number=None,plotn=False,drawchol=False)
+    gpcr_lib.plot_density_xray(axes[0],0,"",0,0,self.xray,"low","Intra.",number=None,plotn=False,drawchol=False)
+    gpcr_lib.plot_density_xray(axes[1],0,"",0,0,self.xray,"upp","Extra.",number=None,plotn=False,drawchol=False)
 
     rad = 30.0
     cent = np.array([0.0,0.0])

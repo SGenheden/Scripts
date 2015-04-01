@@ -62,3 +62,8 @@ MOL=b2
 python2.7 $SCRIPTS/Gpcr/gpcr_plot_density.py -f1 r{1..5}_md3_en_fit_densities.npz -o $DENS/density_${MOL}_ -d chol2 popc -m ${MOL} -l chol. lip.
 
 python2.7 $SCRIPTS/Gpcr/gpcr_plot_density.py -f1 r{1..5}_md3_fit_densities.npz -o $DENS/density_${MOL} -d chol2 popc -m ${MOL} -l chol. lip.
+
+# Misc stuff
+
+python2.7 gpcr_plot_fractalpies.py --probes 2.0 2.5 3.0 3.5 4.0 4.5 --npies 14
+gpcr_plot_gridenergy.py -p /media/data4/sg6e12/Gpcr/Cg/B2/3d4s/Chol-30/system.top -m b2
