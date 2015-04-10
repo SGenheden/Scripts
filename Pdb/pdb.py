@@ -16,6 +16,7 @@ import copy
 import numpy as np
 from scipy.spatial.distance import cdist
 
+codes = {"arg":"R", "his":"H","hid":"H","hie":"H","hip":"H", "lys":"K", "asp":"D", "glu":"E", "ser":"S", "thr":"T", "asn":"N", "gln":"Q", "cys":"C", "gly":"G", "pro":"P", "ala":"A", "val":"V", "ile":"I", "leu":"L", "met":"M", "phe":"F", "tyr":"Y", "trp":"W"}
 
 heavy_aa = {"ALA":["N","CA","CB","C","O"],
 "GLY":["N","CA","C","O"],
@@ -191,6 +192,36 @@ class PDBFile :
       for i,atom in enumerate(self.atoms,1) :
         atom.serial = i
    
+  def reorder(self,resnames,atomnames=[]) :
+  
+    new_residues = []
+    for nam in resnames :
+      i = 0
+      while i < len(self.residues) :
+        if self.residues[i].resname.strip() == nam.strip() :
+          new_residues.append(self.residues.pop(i))
+        i += 1
+    self.residues = new_residues
+    
+    if len(atomnames) != len(self.residues) :
+      atomnames = [None]*len(self.residues)
+    
+    self.atoms = []
+    for res,nams in zip(self.residues,atomnames) :
+      if nams is not None : res.reorder(nams)
+      self.atoms.extend(res.atoms)
+    
+    self.renumber()
+   
+  def split_residue(self,index,npieces) :
+  
+    new_len = len(self.residues[index].atoms)/npieces
+    for j in range(1,npieces) :
+      new_res = Residue()
+      for i in range(new_len) :
+        new_res.append(self.residues[index].atoms.pop(new_len))
+      self.residues.append(new_res)
+   
   def cterminal(self) :
     """
     Return a list of the indices of residues at the end of chains   
@@ -321,7 +352,8 @@ class PDBFile :
     f.write("Written by pdb.py\n")
     f.write("%8d\n"%len(self.atoms))
     for atom in self.atoms :
-      f.write("%5d%5s%5s%5d%8.3f%8.3f%8.3f\n"%(atom.residue,atom.resname,atom.name,atom.serial,atom.x/10.0,atom.y/10.0,atom.z/10.0))
+      serial = (atom.serial if atom.serial <= 99999 else atom.serial - 99999)
+      f.write("%5d%5s%5s%5d%8.3f%8.3f%8.3f\n"%(atom.residue,atom.resname,atom.name,serial,atom.x/10.0,atom.y/10.0,atom.z/10.0))
     if self.box != None :
       f.write("%8.3f%8.3f%8.3f\n"%(self.box[0]/10.0,self.box[1]/10.0,self.box[2]/10.0))
     else :
@@ -569,6 +601,15 @@ class Atom :
       pass
     return name[0]
 
+  def set_xyz(self,xyz) :
+    """
+    Sets the Cartesian coordinates
+    """
+    self.x = xyz[0]
+    self.y = xyz[1]
+    self.z = xyz[2]
+    self.xyz = np.array(xyz)
+
 class Residue :
   """
   Class to encapsulate a collection of Atom objects
@@ -721,3 +762,16 @@ class Residue :
     elif operation == "masses" :
       return vector[:,0]
     return vector 
+
+  def reorder(self,atomnames) :
+    """
+    Reorder the atoms according to a given list of atom names
+    """
+    new_atoms = []
+    for nam in atomnames :
+      i = 0
+      while i < len(self.atoms) :
+        if self.atoms[i].name.strip() == nam.strip() :
+          new_atoms.append(self.atoms.pop(i))
+        i += 1
+    self.atoms = new_atoms
