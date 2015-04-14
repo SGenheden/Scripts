@@ -93,7 +93,7 @@ if __name__ == '__main__' :
   # Command-line input
   parser = argparse.ArgumentParser(description="Converting between a lammps data file and a PDB-file")
   parser.add_argument('file',help="the lammps data file")
-  parser.add_argument('-o','--out',help="the pdb file",default="converted.pdb")
+  parser.add_argument('-o','--out',help="the pdb file")
   parser.add_argument('-d','--dict',help="a dictionary to determine how to parse the data file to a PDB-file",nargs="+",default=["0:W","d:dop"])
   parser.add_argument('-w','--whole',action='store_true',help="turns on making molecules whole",default=False)
   parser.add_argument('-r','--renumber',action='store_true',help="renumber residues",default=False)
@@ -191,6 +191,11 @@ if __name__ == '__main__' :
       atom.set_xyz(atom.xyz-delta_com)
              
   # Write out the PDB file
+  if args.out is None :
+    s1,s2 = os.path.splitext(args.file)
+    args.out = s2[1:]+".pdb"
+    print "Writing PDB file: "+args.out
+
   def add_con(pdbfile,f) :
     for bnd in bonds :
       f.write("CONECT%5d%5d\n"%(bnd[0],bnd[1]))

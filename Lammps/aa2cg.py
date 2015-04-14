@@ -63,7 +63,7 @@ if __name__ == '__main__' :
 
   # Command-line input
   parser = argparse.ArgumentParser(description="Converting a AA to CG or AA/CG")
-  parser.add_argument('-f','--file',help="the PDB or GRO file")
+  parser.add_argument('file',help="the PDB or GRO file")
   parser.add_argument('-i','--include',help="the LAMMPS include file")
   parser.add_argument('-o','--out',help="the output prefix",default="converted")
   parser.add_argument('-b','--box',type=float,nargs=3,help="the box dimensions",default=[0.0,0.0,0.0])
@@ -103,7 +103,8 @@ if __name__ == '__main__' :
     aa_datafiles[res] = lammps.Datafile(filename)
     # Extend the force field parameters
     # by extending the inclusion file, we will automatically update the parameter index
-    include.extend_from_data(aa_datafiles[res],lj_hybrid=[1,-1],lj_func=["lj/sf/dipole/sf",args.pairfunc],ang_func="harmonic")
+    ELBA_FUNC = "lj/sf/dipole/sf"
+    include.extend_from_data(aa_datafiles[res],lj_hybrid=-1,lj_func=args.pairfunc,lj_hybrid_mix={ELBA_FUNC:1},lj_func_mix={ELBA_FUNC:ELBA_FUNC},ang_func="harmonic")
     # Update the atom and conectivity parameters
     for atom in aa_datafiles[res].atoms : 
       atom.atype = atom.atype + natomtypes

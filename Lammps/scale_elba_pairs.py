@@ -20,6 +20,8 @@ Example (standard scaling in hybrid simulation) :
 
 import argparse
 
+import numpy as np
+
 import lammps
 
 if __name__ == '__main__' :
