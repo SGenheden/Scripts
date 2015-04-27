@@ -37,12 +37,15 @@ if __name__ == '__main__' :
 
   # Collect the mobile atoms, i.e. the AA backbone atoms
   mob = np.zeros([nres,3])
-  for i,res in enumerate(aastruct.residues[:nres]) :
+  i = 0
+  for res in aastruct.residues :
+    if res.resname not in pdb.std_aa_names : continue
     cent = np.zeros(3)
     for atom in res.atoms :
       if atom.name.strip() in ["N","CA","C","O"] :
         cent = cent + atom.xyz
     mob[i,:] = cent / 4.0
+    i = i + 1
 
   # Collect the reference atoms, i.e. the BB beads
   ref = np.zeros([nres,3]) 
@@ -52,7 +55,8 @@ if __name__ == '__main__' :
         ref[i,:] = atom.xyz
         break
   
-  
+  print "Initial RMSD=",np.sqrt(np.mean(np.sum((mob-ref)**2,axis=1)))
+
   xyz2 = fitting.dofit(ref,mob,aastruct.xyz)
 
   for i,c in enumerate(xyz2) :

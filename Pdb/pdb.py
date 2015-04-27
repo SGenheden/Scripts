@@ -193,7 +193,16 @@ class PDBFile :
         atom.serial = i
    
   def reorder(self,resnames,atomnames=[]) :
-  
+    """
+    Reorder the residues and atoms
+    
+    Parameters
+    ----------
+    resnames : list of string
+      the order of the residues
+    atomnames : list of list of strings
+      the atom names of each sorted residue
+    """
     new_residues = []
     for nam in resnames :
       i = 0
@@ -350,10 +359,16 @@ class PDBFile :
       filename = self.filename
     f = open(filename,"w")
     f.write("Written by pdb.py\n")
-    f.write("%8d\n"%len(self.atoms))
+    n = 0
     for atom in self.atoms :
-      serial = (atom.serial if atom.serial <= 99999 else atom.serial - 99999)
+      if not atom.hidden : n += 1
+    f.write("%8d\n"%n)
+    aserial = 1
+    for atom in self.atoms :
+      if atom.hidden : continue
+      serial = (aserial if aserial <= 99999 else aserial - 99999)
       f.write("%5d%5s%5s%5d%8.3f%8.3f%8.3f\n"%(atom.residue,atom.resname,atom.name,serial,atom.x/10.0,atom.y/10.0,atom.z/10.0))
+      aserial += 1
     if self.box != None :
       f.write("%8.3f%8.3f%8.3f\n"%(self.box[0]/10.0,self.box[1]/10.0,self.box[2]/10.0))
     else :
@@ -779,3 +794,17 @@ class Residue :
           new_atoms.append(self.atoms.pop(i))
         i += 1
     self.atoms = new_atoms
+
+  def rename(self,atomnames) :
+    """
+    Rename atoms according to the dictionary
+    """
+    for atom in self.atoms :
+      aname = atom.name.strip()
+      if not aname in atomnames :
+        raise Exception("Could not find %s in dictionary"%aname)
+      else :
+        if atomnames[aname] == "*" :
+          atom.hidden = True
+        else :
+          atom.name = atomnames[aname]

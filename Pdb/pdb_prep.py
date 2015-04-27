@@ -220,7 +220,10 @@ def _do_describe(pdbfile,pid,filename) :
     meta["src_common"] = root.findall("%sentity_src_genCategory/%sentity_src_gen[1]/%sgene_src_common_name"%(ns,ns,ns) )[0].text
   except :
     meta["src_common"] = None
-  meta["src"] = root.findall("%sentity_src_genCategory/%sentity_src_gen[1]/%spdbx_gene_src_scientific_name"%(ns,ns,ns) )[0].text
+  try :
+    meta["src"] = root.findall("%sentity_src_genCategory/%sentity_src_gen[1]/%spdbx_gene_src_scientific_name"%(ns,ns,ns) )[0].text
+  except :
+    meta["src"] = ""
   try :
     meta["ph"] = root.findall("%sexptl_crystal_growCategory/%sexptl_crystal_grow[1]/%spH"%(ns,ns,ns) )[0].text
   except :
@@ -556,7 +559,7 @@ def _do_his(pdbfile,pid,user_sel) :
           else :
             k = i-2
           if k < 0 :
-            d4 = presidue.atoms[-abs(k)].xyz-atom.xyz
+            d4 = residue.atoms[-abs(k)].xyz-atom.xyz
           else :
             d4 = residue.atoms[k].xyz-atom.xyz
           ld4 = np.sqrt(np.sum(d4**2))

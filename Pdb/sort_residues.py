@@ -16,8 +16,8 @@ if __name__ == '__main__' :
 
   # Command-line input
   parser = argparse.ArgumentParser(description="Sort the residue in a PDB file")
-  parser.add_argument('-f','--file',help="the PDB file")
-  parser.add_argument('-o','--out',help="the output file",default="sorted.pdb")
+  parser.add_argument('file',help="the PDB file")
+  parser.add_argument('-o','--out',help="the output file")
   parser.add_argument('-r','--residues',nargs="+",help="the residue order",default=[])
   args = parser.parse_args()
 
@@ -39,4 +39,7 @@ if __name__ == '__main__' :
   for resnam in residues :
     pdbout.extend_residues(resdic[resnam],makecopy=False,dochains=False)
   pdbout.renumber()
+  
+  if args.out is None :
+    args.out = os.path.splitext(args.file)[0]+"_sorted.pdb"
   pdbout.write(args.out)

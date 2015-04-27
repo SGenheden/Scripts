@@ -5,8 +5,8 @@ Program to make input to Gaussian for (R)ESPA calculations
 
 Examples
 --------
-  pdb2respa_inp.py -f mol1.pdb mol2.pdb 
-  pdb2respa_inp.py -f mol1.pdb -v ff03 -c -1
+  pdb2respa_inp.py mol1.pdb mol2.pdb 
+  pdb2respa_inp.py mol1.pdb -v ff03 -c -1
   
 """
 
@@ -23,7 +23,7 @@ if __name__ == '__main__' :
 
   # Command-line input
   parser = argparse.ArgumentParser(description="Making Gaussian input for (R)ESPA calculations")
-  parser.add_argument('-f','--file',nargs="+",help="the PDB files")
+  parser.add_argument('file',nargs="+",help="the PDB files")
   parser.add_argument('-v','--version',choices=["ff94","ff03"],help="the force field version, can be either ff94 or ff03",default="ff94")
   parser.add_argument('-c','--charge',type=float,help="The net charge of the molecule(s)",default=0)
   parser.add_argument('-p','--processors',type=int,help="The number of processors to use",default=1)

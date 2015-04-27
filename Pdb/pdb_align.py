@@ -5,7 +5,7 @@ Program align a PDB structure to a specific axis
 
 Examples
 --------
-  pdb_align.py -f prot.pdb -a z
+  pdb_align.py prot.pdb -a z
 """
 
 import argparse
@@ -14,7 +14,7 @@ import sys
 
 import numpy as np
 
-# Import the fitting module
+# Import the fitting and geo modules
 thispath = os.path.dirname(os.path.abspath(__file__))
 oneup = os.path.split(thispath)[0]
 sys.path.insert(0,os.path.join(oneup,"Lib"))
@@ -22,15 +22,14 @@ import fitting
 import geo
 import pdb
 
-
 if __name__ == "__main__":
 
 
   # Setup a parser of the command-line arguments
   parser = argparse.ArgumentParser(description="Program to make align a PDB file to a specific axis")
-  parser.add_argument('-f','--file',help="the PDB file")
+  parser.add_argument('file',help="the PDB file")
   parser.add_argument('-a','--axis',choices=["x","y","z"],help="the axis to align to",default="z")
-  parser.add_argument('-o','--out',help="the output filename, default='aligned.pdb'",default="aligned.pdb")
+  parser.add_argument('-o','--out',help="the output filename")
   args = parser.parse_args()
 
   pdbfile = pdb.PDBFile(filename=args.file)
@@ -55,11 +54,8 @@ if __name__ == "__main__":
   alpha = geo.angle(princip[0,:],normv)
   rotmat = geo.rotation_matrix(alpha,rotvec)
   xyz = fitting.rotate(xyz,rotmat)+center
+  pdbfile.update_xyz(xyz)
 
-  # Update the coordinates of the pdbfile
-  for i,atom in enumerate(pdbfile.atoms) :
-    atom.x = xyz[i,0]
-    atom.y = xyz[i,1]
-    atom.z = xyz[i,2]
-
+  if args.out is None :
+    args.out = os.path.splitext(args.file)[0]+"_aligned.pdb"
   pdbfile.write(args.out)
