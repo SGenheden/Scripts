@@ -54,6 +54,10 @@ def parse_molecules(data,order=False) :
     return molecules
 
 def comp_pair(p1,p2) :
+  """
+  Compare pair parameters, and determine which
+  has precedence in a sorted list
+  """
   def comp_atoms(p1,p2) :    
     if p1.iatom < p2.iatom :
       return -1

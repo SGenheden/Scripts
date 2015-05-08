@@ -223,7 +223,10 @@ class PDBFile :
     self.renumber()
    
   def split_residue(self,index,npieces) :
-  
+    """
+    Split a residue into several individual residues
+    """
+
     new_len = len(self.residues[index].atoms)/npieces
     for j in range(1,npieces) :
       new_res = Residue()
