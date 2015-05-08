@@ -17,11 +17,11 @@ if __name__ == '__main__' :
   parser = argparse.ArgumentParser(description="Write out atom types of heavy atoms")
   parser.add_argument('file',help="the lammps include file")
   parser.add_argument('-x','--exclude',type=float,nargs="+",help="exclude these",default=[40.0,90.0,62.0,42.0])
-  parser.add_argument('-h','--hydrogen',type=float,help="the mass of hydrogen",default=1.00800)
+  parser.add_argument('-m','--mass',type=float,help="the mass of hydrogen",default=1.00800)
   args = parser.parse_args()
   
   atypes = []
   for m in lammps.Includefile(args.file).masses :
-    if not (m.mass in args.exclude or m.mass == args.hydrogen) :
+    if not (m.mass in args.exclude or m.mass == args.mass) :
       atypes.append(m.idx)
   print " ".join(["%d"%i for i in atypes])

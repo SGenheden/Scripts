@@ -2,11 +2,12 @@
 
 """
 Program to make input to the colvars library to perform umbrella sampling simulations
+with Lammps
 
 It will produce an output file for each value of the --zdepth argument
 
 Example:
-  make_colvars.py -f data.elba_toluene_z0 -m 1 128 -s 129 -z {0..30}
+  make_colvars.py data.elba_toluene_z0 -m 1 128 -s 129 -z {0..30}
 """
 
 import argparse
@@ -17,7 +18,7 @@ if __name__ == '__main__' :
 
   # Command-line input
   parser = argparse.ArgumentParser(description="Making colvars input for an umbrella simulation")
-  parser.add_argument('-f','--file',help="a template data file.",default="")
+  parser.add_argument('file',help="a template data file.",default="")
   parser.add_argument('-o','--out',help="the output file prefix.",default="colvars.")
   parser.add_argument('-m','--membrane',type=int,nargs=2,help="the first and last molecule of the membrane")
   parser.add_argument('-s','--solute',type=int,help="the molecule id of the solute")

@@ -49,15 +49,15 @@ def _generate_aa_residue(residue,molidx,resdata,sysdata) :
 
   for bond in resdata.bonds :  
     b = lammps.Connectivity(record="%d %d %d %d"%(len(sysdata.bonds)+1,bond[0],bond[1]+n,bond[2]+n))
-    data.bonds.append(b)
+    sysdata.bonds.append(b)
 
   for angle in resdata.angles :      
     a = lammps.Connectivity(record="%d %d %d %d %d"%(len(sysdata.angles)+1,angle[0],angle[1]+n,angle[2]+n,angle[3]+n))
-    data.angles.append(a)
+    sysdata.angles.append(a)
 
   for dihedral in resdata.dihedrals :      
     a = lammps.Connectivity(record="%d %d %d %d %d %d"%(len(sysdata.dihedrals)+1,dihedral[0],dihedral[1]+n,dihedral[2]+n,dihedral[3]+n,dihedral[4]+n))
-    data.dihedrals.append(a)
+    sysdata.dihedrals.append(a)
 
 if __name__ == '__main__' :
 
@@ -81,6 +81,7 @@ if __name__ == '__main__' :
 
   # Create a Datafile and PDBFile
   pdbfile = pdb.PDBFile(args.file) # Input PDB
+  takeres = [True for res in pdbfile.residues]
   data = lammps.Datafile() 
   pdbout = pdb.PDBFile() # Output PDB
 
@@ -97,9 +98,11 @@ if __name__ == '__main__' :
 
   # Load datafiles for given solutes, will assume these are atomistic
   aa_datafiles = {} 
+  aa_range = None
   for sol in args.atomistic :
     res,filename = sol.split("=")
     res = res.lower()
+    if res[0] == ":" : aa_range = res
     aa_datafiles[res] = lammps.Datafile(filename)
     # Extend the force field parameters
     # by extending the inclusion file, we will automatically update the parameter index
@@ -115,15 +118,32 @@ if __name__ == '__main__' :
     for cons,ntypes in zip(conlist,contypes) :
       for con in cons : con.param = con.param + ntypes
 
+  # Add a range of all-atom residues to the data file
+  moli = 0
+  if aa_range is not None :
+    first,last = map(lambda x:int(x)-1,aa_range[1:].split("-"))
+    resall = pdb.Residue()
+    allres = []
+    for i in range(first,last+1) :
+      for atom in pdbfile.residues[i].atoms :
+        resall.append(atom)
+      allres.append(pdbfile.residues[i])
+      takeres[i] = False
+    _generate_aa_residue(resall,1,aa_datafiles[aa_range],data)
+    moli = 1
+    pdbout.extend_residues(allres,dochains=False)
+  
   # Convert residues
   all_coords = []
   nwat = 0
-  for i,res in enumerate(pdbfile.residues) :
+  for i,(res,takethis) in enumerate(zip(pdbfile.residues,takeres)) :
+    if not takethis : continue
+    moli += 1
     res2 = res.resname.strip().lower()
     found = False
     # If we have an all-atom datafile as a template, keep it as all-atom
     if res2 in aa_datafiles :
-      _generate_aa_residue(res,i+1-nwat,aa_datafiles[res2],data)
+      _generate_aa_residue(res,moli+1-nwat,aa_datafiles[res2],data)
       coord = res.collect("xyz")
       pdb.make_pdbres(coord,[atom.name for atom in res.atoms],res2,pdbout)
       found = True
@@ -131,7 +151,7 @@ if __name__ == '__main__' :
     else :
       for residue in converter.residues :
         if residue.name == res2 :
-          coord = residue.generate_cg(res,i+1,data)
+          coord = residue.generate_cg(res,moli+1,data)
           all_coords.extend(coord)
           pdb.make_pdbres(coord,residue.cg_names,res2,pdbout)
           found = True
@@ -144,6 +164,7 @@ if __name__ == '__main__' :
           coord = residue.generate_cg(res,0,data)
           all_coords.extend(coord)
           pdb.make_pdbres(coord,residue.cg_names,"wat",pdbout)
+    
   all_coords = np.array(all_coords)
 
   print "Minimum of coordinates = %.3f %.3f %.3f"%tuple(all_coords.min(axis=0))
