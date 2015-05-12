@@ -5,9 +5,9 @@ Program to insert an atomistic solute in box of ELBA molecules
 
 Examples
 --------
-  insert_in_elba.py -o elba_toluene -b data.128dopc_4232wat -f forcefield.elba -s data.toluene -z {0..30} --respa
-  insert_in_elba.py -b data.128dopc_4232wat_mod_whole -f forcefield.elba_mod -s data.kalp23_heavyh -o 128dopc_kalp23 --respa --resize -p kalp23_initial_placed.pdb
-  insert_in_elba.py -b data.140popc_60chol_whole -f forcefield.140popc_60chol_mod2 -s data.b2_heavyh -o 140popc_60chol_b2 --respa --resize -p b2_initial_placed.pdb --dihfunc harmonic --dihfunc_box charmm --pairmix lj/charmm/coul/long/14:lj/charmm/coul/long
+  insert_in_elba.py data.toluene -o elba_toluene -b data.128dopc_4232wat -f forcefield.elba -z {0..30}
+  insert_in_elba.py data.kalp23_heavyh -b data.128dopc_4232wat_mod_whole -f forcefield.elba_mod -o 128dopc_kalp23 --resize -p kalp23_initial_placed.pdb
+  insert_in_elba.py data.b2_heavyh -b data.140popc_60chol_whole -f forcefield.140popc_60chol_mod2 -o 140popc_60chol_b2 --resize -p b2_initial_placed.pdb --dihfunc harmonic --dihfunc_box charmm --pairmix lj/charmm/coul/long/14:lj/charmm/coul/long
 """
 
 import argparse
@@ -39,12 +39,12 @@ if __name__ == '__main__' :
 
   # Setup a parser of the command-line arguments
   parser = argparse.ArgumentParser(description="Program to insert an atomistic solute in an ELBA box")
+  parser.add_argument('solute',help="the name of the solute to be insert")
   parser.add_argument('-o','--out',help="the name of the output ")
   parser.add_argument('-b','--box',help="the name of the box ")
   parser.add_argument('-f','--ff',help="name of the ELBA force field parameters",default="elba")
-  parser.add_argument('-s','--solute',help="the name of the solute to be insert")
   parser.add_argument('-p','--pdb',help="a PDB-file of coordinates for the solute to insert")
-  parser.add_argument('--respa',help="insert rRESPA hybrid flags into include file",action='store_true',default=False)
+  parser.add_argument('--norespa',help="do not insert rRESPA hybrid flags into include file",action='store_true',default=False)
   parser.add_argument('--resize',help="resize box to fit solutes",action="store_true",default=False)
   parser.add_argument('-t','--type',choices=["cg2","cg1","aa"],help="the type of LAMMPS box, should be either 'cg2','cg1', 'aa'",default="cg1")
   parser.add_argument('-z','--zcent',nargs="+",type=float,help="the z-coordinate that the solute will be inserted at")
@@ -76,13 +76,13 @@ if __name__ == '__main__' :
   ELBA_FUNC = "lj/sf/dipole/sf"
   for pair in box_ff.pair_coeff :
     if pair.func == "" : pair.func = ELBA_FUNC
-    if args.respa and pair.hybrid == -1 and pair.func == ELBA_FUNC: pair.hybrid = 2
+    if not args.norespa and pair.hybrid == -1 and pair.func == ELBA_FUNC: pair.hybrid = 2
 
   lj_hybrid = -1
-  if args.respa : lj_hybrid = 1
+  if not args.norespa : lj_hybrid = 1
 
   lj_func = {ELBA_FUNC:ELBA_FUNC}
-  if args.respa :
+  if not args.norespa :
     lj_hybrid = {ELBA_FUNC:1}
   else :
     lj_hybrid = None
@@ -90,7 +90,7 @@ if __name__ == '__main__' :
     for pm in args.pairmix :
       k,v = pm.split(":")
       lj_func[k] = v
-      if args.respa : lj_hybrid[k] = -1
+      if not args.norespa : lj_hybrid[k] = -1
 
   # Extend the force field file with stuff from the datafile
   box_ff.extend_from_data(solute_data,lj_hybrid=-1,lj_func=args.pairfunc,lj_hybrid_mix=lj_hybrid,lj_func_mix=lj_func,ang_func="harmonic",dih_func=args.dihfunc)

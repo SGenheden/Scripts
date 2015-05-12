@@ -82,7 +82,7 @@ def make_whole(atoms,box,atom0idx=0,verbose=False) :
     atomi.xyz = np.array([atomi.x,atomi.y,atomi.z])    
 
 def make_whole_xyz(xyz,box,dim=[True,True,True]) :
-   """
+  """
   Make a list of coordinates whole
 
   Parameters

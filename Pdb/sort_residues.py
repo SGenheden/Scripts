@@ -2,6 +2,12 @@
 
 """
 Program to sort the residues in a PDB file
+
+Default name is input with "_sorted" appended to the end
+
+Examples
+--------
+  sort_residues.py prot.pdb -r SOL WAT CL
 """
 
 import sys
