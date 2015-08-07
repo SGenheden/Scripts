@@ -8,7 +8,7 @@ They were written to be used with python version 2.7 and requires the following 
 * [scipy](http://www.scipy.org/)
 * [matplotlib](http://www.matplotlib.org/)
 
-Most of the programs are dependent on the sgenlib package, and therefor the PYTHONPATH environmental variable needs to be amended to include the installation path of this repository. Assuming this repository was downloaded to a folder called $SCRIPT this can be accomplished with.
+Most of the programs are dependent on the `sgenlib` package, and therefor the PYTHONPATH environmental variable needs to be amended to include the installation path of this repository. Assuming this repository was downloaded to a folder called $SCRIPT this can be accomplished with.
 
 ```
 export PYTHONPATH=$PYTHONPATH:$SCRIPTS 
