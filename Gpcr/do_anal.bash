@@ -53,7 +53,7 @@ python2.7 $SCRIPTS/Gpcr/gpcr_plot_density.py -f1 r{1..5}_md3_en_fit_densities.np
 
 python2.7 $SCRIPTS/Gpcr/gpcr_plot_density.py -f1 r{1..5}_md3_fit_densities.npz -f2 Active/r{1..5}_md3_fit_densities.npz -o $DENS/density_a2a_chol-oh -d hydroxyl2 hydroxyl2 -m a2a a2a_a -l inactive active -c 1:chol2 2:chol2
 
-python2.7 $SCRIPTS/Gpcr/gpcr_plot_density.py -f1 r{1..5}_md3_en_fit_densities.npz -f2 Active/r{1..5}_md3_fit_densities.npz -o $DENS/density_b2_chol -d chol2 chol2 -m b2 b2_a -l inactive active
+python2.7 $SCRIPTS/Gpcr/gpcr_plot_density.py -f1 r{1..5}_md3_en_fit_densities.npz -f2 Active/r{1..5}_md3_fit_densities.npz -o $DENS/density_${MOL}_chol -d chol2 chol2 -m ${MOL} ${MOL}_a -l inactive active
 
 python2.7 $SCRIPTS/Gpcr/gpcr_plot_density.py -f1 r{1..5}_md3_en_fit_densities.npz -f2 Active/r{1..5}_md3_fit_densities.npz -o $DENS/density_b2_lip -d popc popc -m b2 b2_a -l inactive active
 

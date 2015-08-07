@@ -10,13 +10,8 @@ import numpy as np
 import os
 import sys
 
-thispath = os.path.dirname(os.path.abspath(__file__))
-oneup = os.path.split(thispath)[0]
-sys.path.insert(0,os.path.join(oneup,"Pdb"))
-sys.path.insert(0,os.path.join(oneup,"Lammps"))
-
-import pdb
-import lammps
+from . import pdb
+from . import lammps
 
 def make_whole(atoms,box,atom0idx=0,verbose=False) :
   """

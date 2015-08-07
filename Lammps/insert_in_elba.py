@@ -16,13 +16,8 @@ import os
 
 import numpy as np
 
-# Import the PDB and Lammps modules
-thispath = os.path.dirname(os.path.abspath(__file__))
-oneup = os.path.split(thispath)[0]
-sys.path.insert(0,os.path.join(oneup,"Pdb"))
-sys.path.insert(0,os.path.join(oneup,"Lammps"))
-import lammps
-import pdb
+from sgenlib import lammps
+from sgenlib import pdb
 
 def _center_solute(solute_data,zcent) :
 

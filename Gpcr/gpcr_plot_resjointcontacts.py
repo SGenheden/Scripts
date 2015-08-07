@@ -20,12 +20,8 @@ import matplotlib.pyplot as plt
 
 import pycontacts
 import gpcr_lib
-thispath = os.path.dirname(os.path.abspath(__file__))
-oneup = os.path.split(thispath)[0]
-sys.path.insert(0,os.path.join(oneup,"Plot"))
-sys.path.insert(0,os.path.join(oneup,"Pdb"))
-import colors
-import pdb 
+from sgenlib import colors
+from sgenlib import pdb 
 
 def _resjointcontacts(filename,label,mat,repeats,out,mol) :
   """

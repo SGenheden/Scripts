@@ -14,11 +14,8 @@ import argparse
 import os
 import sys
 
-thispath = os.path.dirname(os.path.abspath(__file__))
-oneup = os.path.split(thispath)[0]
-sys.path.insert(0,os.path.join(oneup,"Lib"))
-import pbc
-import pdb
+from sgenlib import pbc
+from sgenlib import pdb
 
 if __name__ == '__main__' :
 

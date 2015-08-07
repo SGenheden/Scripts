@@ -18,13 +18,8 @@ import copy
 
 import numpy as np
 
-import lammps
-
-# Import the PDB module
-thispath = os.path.dirname(os.path.abspath(__file__))
-oneup = os.path.split(thispath)[0]
-sys.path.insert(0,os.path.join(oneup,"Pdb"))
-import pdb
+from sgenlib import lammps
+from sgenlib import pdb
 
 def _ntypes(array) :
   """

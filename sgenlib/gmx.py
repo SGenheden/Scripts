@@ -1,11 +1,12 @@
-import os
-import pdb
-import geo
+# Author: Samuel Genheden samuel.genheden@gmail.com
 
-#
-# Classes to parse a Gromacs top-file
-# do not read everything from the files!
-#
+"""
+Classes to read and manipulate some Gromacs files
+"""
+
+import os
+
+from . import geo
 
 
 #

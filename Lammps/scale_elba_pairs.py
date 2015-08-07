@@ -22,7 +22,7 @@ import argparse
 
 import numpy as np
 
-import lammps
+from sgenlib import lammps
 
 if __name__ == '__main__' :
 

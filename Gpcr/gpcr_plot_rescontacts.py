@@ -27,12 +27,8 @@ import matplotlib.pyplot as plt
 
 import pycontacts
 import gpcr_lib
-thispath = os.path.dirname(os.path.abspath(__file__))
-oneup = os.path.split(thispath)[0]
-sys.path.insert(0,os.path.join(oneup,"Plot"))
-sys.path.insert(0,os.path.join(oneup,"Pdb"))
-import colors
-import pdb
+from sgenlib import colors
+from sgenlib import pdb
 
 def _plot_text(axis,text,xcoord,ycoord,arrows=False) :
   """
@@ -110,7 +106,7 @@ def _draw_2d(axis,residues0,residues,contacts) :
   axis.set_xlabel("Residue")
   axis.set_ylabel("Residue")
   
-def _draw_1d(axis,residues0,residues,codes,helices,contacts,ylabel,setylim=True,plottext=True) :
+def _draw_1d(axis,residues0,residues,codes,helices,contacts,ylabel,setylim,plottext=True) :
   """
   Draw a residue contact probability plot
   
@@ -143,7 +139,7 @@ def _draw_1d(axis,residues0,residues,codes,helices,contacts,ylabel,setylim=True,
     
   # Fix extent of axis and xticks
   axis.set_xlim([0,residues0[-1]])
-  if setylim : axis.set_ylim([0,80])
+  axis.set_ylim([0,setylim])
   sel = residues > 0
   axis.set_xticks(residues0[sel][::20])
   axis.set_xticklabels(residues[sel][::20])
@@ -209,7 +205,7 @@ def _draw_aa(axis,names,contacts_list,labels) :
   axis.set_xlim([0,left[-1]+1.3])
   axis.set_ylabel("Average contact probability")
 
-def _rescontacts(filenames,labels,repeats,out,mol,time) :
+def _rescontacts(filenames,labels,repeats,out,mol,time,every) :
   """
   Main analysis routine
   
@@ -227,6 +223,8 @@ def _rescontacts(filenames,labels,repeats,out,mol,time) :
     protein identifier
   time : float
     the total simulation time
+  every : int
+    the reading frequency
   """
   
   # Load the protein template to obtain residue information
@@ -239,7 +237,7 @@ def _rescontacts(filenames,labels,repeats,out,mol,time) :
   pcontacts = []
   for fi,(filename,label) in enumerate(zip(filenames,labels)) :
     # Read the state file from disc and perform pairwise contact analysis
-    states = [gpcr_lib.read_statefile(filename)]
+    states = [gpcr_lib.read_statefile(filename,every)]
     pp = pycontacts.pairwise_contacts(states[-1])
           
     # Do the same for multiple repeats and average over them
@@ -248,7 +246,7 @@ def _rescontacts(filenames,labels,repeats,out,mol,time) :
       pcontacts[-1][0,:,:] = pp
       for ri,r in enumerate(repeats[1:],1) :
         filename2 = filename.replace(repeats[0],r)
-        states.append(gpcr_lib.read_statefile(filename2))
+        states.append(gpcr_lib.read_statefile(filename2,every))
         pp = pycontacts.pairwise_contacts(states[-1])
         pcontacts[-1][ri,:,:] = pp
       pcontacts[-1] = pcontacts[-1].mean(axis=0)*100.0
@@ -275,7 +273,7 @@ def _rescontacts(filenames,labels,repeats,out,mol,time) :
   
     # Draw a residue contact probability plot
     f1d = plt.figure(20+fi,figsize=(6.85,3.41),tight_layout=True) 
-    _draw_1d(f1d.gca(),residues0,residues,codes,template.rhelices,pcontacts[-1].diagonal(),"Contact probability")
+    _draw_1d(f1d.gca(),residues0,residues,codes,template.rhelices,pcontacts[-1].diagonal(),"Contact probability",80)
     f1d.savefig("%s_%s_1d.png"%(out,label),format="png",dpi=300)
     
     # And print it out do disc
@@ -284,13 +282,13 @@ def _rescontacts(filenames,labels,repeats,out,mol,time) :
         f.write("%s%d %8.3f\n"%(name.capitalize(),res,prob))
         
     # Draw a average lifetime plot
-    f1d = plt.figure(40+fi) 
-    _draw_1d(f1d.gca(),residues0,residues,codes,template.rhelices,life_av,"Average lifetime",setylim=False,plottext=False)
+    f1d = plt.figure(40+fi,figsize=(6.85,3.41),tight_layout=True) 
+    _draw_1d(f1d.gca(),residues0,residues,codes,template.rhelices,life_av,"Average lifetime (ns)",0.6)
     f1d.savefig("%s_%s_avlife.png"%(out,label),format="png")
   
     # Draw a maximum lifetime plot
-    f1d = plt.figure(50+fi) 
-    _draw_1d(f1d.gca(),residues0,residues,codes,template.rhelices,life_max,"Maximum lifetime",setylim=False,plottext=False)
+    f1d = plt.figure(50+fi,figsize=(6.85,3.41),tight_layout=True) 
+    _draw_1d(f1d.gca(),residues0,residues,codes,template.rhelices,life_max,"Maximum lifetime (ns)",35)
     f1d.savefig("%s_%s_maxlife.png"%(out,label),format="png")
   
   # Plot residue-type averaged occupancies
@@ -308,6 +306,7 @@ if __name__ == '__main__' :
   parser.add_argument('--mol',choices=["b2","a2a","b2_a","a2a_a"],help="the protein molecules, should be either 'b2' or 'a2a'",default="b2")
   parser.add_argument('--repeats',nargs="+",help="replacement pattern for multiple repeats",default=["r1_","r2_","r3_","r4_","r5_"]) 
   parser.add_argument('--time',type=float,help="total simulation time in ns",default=50000) 
+  parser.add_argument('--every',type=int,help="reading frequency",default=1) 
   args = parser.parse_args()
   
-  _rescontacts(args.files,args.labels,args.repeats,args.out,args.mol,args.time)
+  _rescontacts(args.files,args.labels,args.repeats,args.out,args.mol,args.time,args.every)

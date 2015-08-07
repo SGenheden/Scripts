@@ -1177,7 +1177,7 @@ class ResidueConverter :
     self.angles = []
     self.dihedrals = []
     self.name = ""
-  def generate_cg(self,residue,molidx,data) :
+  def generate_cg(self,residue,molidx,data,mapping=True) :
     """
     Generate a CG molecule
  
@@ -1208,18 +1208,25 @@ class ResidueConverter :
       return np.array([x,y,z])
       
     # Find and build up the coordinates for each CG bead
-    coords = [np.zeros(3) for name in self.cg_names]
-    counts = {name : 0 for name in self.cg_names}
-    for atom in residue.atoms :
-      name = atom.name.strip().lower()     
-      for i,cg_name in enumerate(self.cg_names) :
-        if name in self.aa_names[cg_name] :
-          coords[i] = coords[i] + atom.xyz
-          counts[cg_name] = counts[cg_name] + 1
+    if mapping :
+      coords = [np.zeros(3) for name in self.cg_names]
+      counts = {name : 0 for name in self.cg_names}
+      for atom in residue.atoms :
+        name = atom.name.strip().lower()     
+        for i,cg_name in enumerate(self.cg_names) :
+          if name in self.aa_names[cg_name] :
+            coords[i] = coords[i] + atom.xyz
+            counts[cg_name] = counts[cg_name] + 1
 
-    for cg_name in self.cg_names :
-      if counts[cg_name] != len(self.aa_names[cg_name]) :
-        print "Could not find all atoms for %s (%d %d)"%(cg_name,counts[cg_name],len(self.aa_names[cg_name]))
+      for cg_name in self.cg_names :
+        if counts[cg_name] != len(self.aa_names[cg_name]) :
+          print "Could not find all atoms for %s (%d %d)"%(cg_name,counts[cg_name],len(self.aa_names[cg_name]))
+
+    else :
+      coords = [np.zeros(3) for name in self.cg_names]
+      counts = {name : 1 for name in self.cg_names}   
+      for i,ratom in enumerate(residue.atoms) :
+        coords[i] = np.array(ratom.xyz,copy=True)
 
     # Create the Atom objects
     n = len(data.atoms) 

@@ -17,7 +17,7 @@ import time
 
 import numpy as np
 
-import pdb
+from sgenlib import pdb
 
 if __name__ == '__main__' :
 

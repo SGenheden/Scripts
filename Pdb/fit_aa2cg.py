@@ -11,12 +11,8 @@ import sys
 
 import numpy as np
 
-# Import the fitting module
-thispath = os.path.dirname(os.path.abspath(__file__))
-oneup = os.path.split(thispath)[0]
-sys.path.insert(0,os.path.join(oneup,"Lib"))
-import fitting
-import pdb
+from sgenlib import fitting
+from sgenlib import pdb
 
 if __name__ == '__main__' :
 

@@ -29,10 +29,7 @@ if not "DISPLAY" in os.environ or os.environ["DISPLAY"] == "" :
 import matplotlib.pyplot as plt
 
 import gpcr_lib
-thispath = os.path.dirname(os.path.abspath(__file__))
-oneup = os.path.split(thispath)[0]
-sys.path.insert(0,os.path.join(oneup,"Plot"))
-import colors
+from sgenlib import colors
 
 def moving(data,window) :
   weights = np.repeat(1.0,window) / float(window)

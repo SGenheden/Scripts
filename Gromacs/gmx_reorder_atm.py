@@ -2,11 +2,8 @@ import argparse
 import os
 import sys
 
-thispath = os.path.dirname(os.path.abspath(__file__))
-oneup = os.path.split(thispath)[0]
-sys.path.insert(0,os.path.join(oneup,"Pdb"))
-import pdb
-import gmx
+from sgenlib import pdb
+from sgenlib import gmx
 
 if __name__ == "__main__":
 

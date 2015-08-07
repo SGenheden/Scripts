@@ -7,7 +7,7 @@ with another.
 
 import argparse
 
-import pdb
+from sgenlib import pdb
 
 if __name__ == "__main__":
 

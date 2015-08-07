@@ -44,6 +44,7 @@ gpcr_mdanal.py -x r1_md3.xtc -s r1_md2.gro -c 5.0
 """
 
 import argparse
+import ConfigParser
 import sys
 import os
 
@@ -55,6 +56,31 @@ md.core.flags['use_periodic_selections'] = True
 md.core.flags['use_KDTree_routines'] = False
 
 import gpcr_lib
+
+def _get_selections(filename) :
+ 
+  selconfig = {}
+  if filename is not None :
+    p = ConfigParser.SafeConfigParser()
+    p.read(filename)   
+    for o in p.options("Selections") :
+      selconfig[o] = p.get("Selections",o)
+  else :
+    selconfig["protein"]="protein"
+    selconfig["phosphate"]="name PO4"
+    selconfig["choline"]="name NC3"    
+    selconfig["hydroxyl"]="name ROH"
+    selconfig["glycerol1"]="name GL2"
+    selconfig["glycerol2"]="name GL1"
+    selconfig["short"]="name C2A,name C3A"
+    selconfig["long"]="name C2B,name D3B,name C4B"
+    selconfig["lipid"]="resname POPC"
+    selconfig["cholesterol"]="resname CHOL"
+    selconfig["lipid-around"]="byres ((name C2A or name C3A or name C2B or name D3B or name C4B) and around %.3f protein)"
+    selconfig["chol-around"]="resname CHOL and around %.3f protein"
+    selconfig["hydroxyl-around"]="byres (name ROH and around %.3f protein)"
+    selconfig["bond-names"]="C1A-C2A C2A-C3A C3A-C4A C1B-C2B C2B-D3B D3B-C4B C4B-C5B"
+  return selconfig
 
 if __name__ == '__main__' :
 
@@ -69,6 +95,7 @@ if __name__ == '__main__' :
   parser.add_argument('-c','--cutoff',type=float,help="contact cut-off",default=6.0)
   parser.add_argument('-bc','--bcutoff',type=float,help="buried cut-off",default=8.0)
   parser.add_argument('--skip',type=int,help="skip every")
+  parser.add_argument('--selections',help="a configuration file with custom selections")
   args = parser.parse_args()
   
   do_density = "density" in args.analysis
@@ -90,35 +117,36 @@ if __name__ == '__main__' :
   universe=md.Universe(args.struct,args.xtc)
   
   # Make selections of interest
-  prot = universe.selectAtoms("protein")
-  residues = [universe.selectAtoms("resid %d"%resid) for resid in prot.resids()]
-  heads = universe.selectAtoms("name PO4") # Lipids head group
-  hydroxyl = universe.selectAtoms("name ROH") # Cholesterol hydroxyl bead
-  glycerols = universe.selectAtoms("name GL2") # Glycerol group
-  glycerols2 = universe.selectAtoms("name GL1") # Glycerol group1
-  nas = universe.selectAtoms("name NC3") # Lipids head group
-  short_chain = [universe.selectAtoms("name %s"%n) for n in "C2A C3A".split()]
-  long_chain = [universe.selectAtoms("name %s"%n) for n in "C2B D3B C4B".split()]
-  lipids= [res for res in universe.selectAtoms("resname POPC").residues] # List of all lipids
-  chols = [res for res in universe.selectAtoms("resname CHOL").residues] # List of all cholesterols
+  selconfig = _get_selections(args.selections)
+  prot = universe.selectAtoms(selconfig["protein"])
+  residues = [prot.selectAtoms("resid %d"%resid) for resid in prot.resids()]
+  heads = universe.selectAtoms(selconfig["phosphate"]) # Lipids head group
+  hydroxyl = universe.selectAtoms(selconfig["hydroxyl"]) # Cholesterol hydroxyl bead
+  glycerols = universe.selectAtoms(selconfig["glycerol1"]) # Glycerol group
+  glycerols2 = universe.selectAtoms(selconfig["glycerol2"]) # Glycerol group1
+  nas = universe.selectAtoms(selconfig["choline"]) # Lipids head group
+  short_chain = [universe.selectAtoms(n) for n in selconfig["short"].split(",")]
+  long_chain = [universe.selectAtoms(n) for n in selconfig["long"].split(",")]
+  lipids= [res for res in universe.selectAtoms(selconfig["lipid"]).residues] # List of all lipids
+  chols = [res for res in universe.selectAtoms(selconfig["cholesterol"]).residues] # List of all cholesterols
   if do_savemol :
-    lipid_around = universe.selectAtoms("byres ((name C2A or name C3A or name C2B or name D3B or name C4B) and around %.3f protein)"%args.cutoff)  
+    lipid_around = universe.selectAtoms(selconfig["lipid-around"]%args.cutoff)  
     if len(chols) > 0 : 
-      chol_around = universe.selectAtoms("resname CHOL and around %.3f protein"%args.cutoff)
-      hydroxyl_around = universe.selectAtoms("byres (name ROH and around %.3f protein)"%args.cutoff)
+      chol_around = universe.selectAtoms(selconfig["chol-around"]%args.cutoff)
+      hydroxyl_around = universe.selectAtoms(selconfig["hydroxyl-around"]%args.cutoff)
   # Lipids bond vectors (the ones below are for POPC)
-  bond_names = "C1A-C2A C2A-C3A C3A-C4A C1B-C2B C2B-D3B D3B-C4B C4B-C5B"
   bond_sel = []
-  for (i,b) in enumerate(bond_names.split()) :
+  for (i,b) in enumerate(selconfig["bond-names"].split()) :
     start,end = b.split("-")
     bond_sel.append([universe.selectAtoms("name %s"%start),universe.selectAtoms("name %s"%end)])
-  
-  # Obtain the first atom index of each residue
+
+  # Obtain the first atom index of each residue, first index is 0
   rfirst = np.zeros(len(residues)+1,dtype=np.int)
-  for i,residue in enumerate(residues) :
-    rfirst[i] = residue[0].number
-  rfirst[-1] = prot[-1].number
-  
+  rfirst[i] = 0
+  for i,residue in enumerate(residues[1:],1) :
+    rfirst[i] = residue[0].number-residues[0][0].number
+  rfirst[-1] = prot[-1].number-residues[0][0].number
+
   # Make grid data
   grid = gpcr_lib.GridTemplate(universe.coord._pos)
   

@@ -15,12 +15,8 @@ import argparse
 
 import numpy as np
 
-# Import the PDB module
-thispath = os.path.dirname(os.path.abspath(__file__))
-oneup = os.path.split(thispath)[0]
-sys.path.insert(0,os.path.join(oneup,"Pdb"))
-import pdb
-import lammps
+from sgenlib import pdb
+from sgenlib import lammps
 
 if __name__ == '__main__' :
 

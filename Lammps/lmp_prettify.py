@@ -15,7 +15,7 @@ Examples:
 
 import argparse
 
-import lammps
+from sgenlib import lammps
 
 if __name__ == '__main__' :
 

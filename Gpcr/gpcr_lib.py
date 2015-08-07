@@ -17,12 +17,8 @@ from MDAnalysis.KDTree.NeighborSearch import CoordinateNeighborSearch
 import matplotlib as plt
 
 # Import the PDB and Plot modules
-thispath = os.path.dirname(os.path.abspath(__file__))
-oneup = os.path.split(thispath)[0]
-sys.path.insert(0,os.path.join(oneup,"Pdb"))
-sys.path.insert(0,os.path.join(oneup,"Plot"))
-import pdb
-import colors
+from sgenlib import pdb
+from sgenlib import colors
 
 # Change this to load protein template and Xray structures from a different location
 PROT_INFO_PATH = "/home/sg6e12/Dropbox/Research/GPCR/Prot_info/"
@@ -1090,7 +1086,7 @@ def read_booleans(fileobj) :
   else :
     return False,[]
 
-def read_statefile(filename) :
+def read_statefile(filename,every=1) :
   """
   Read a state file from disc
   This is a file where on each line there is a bit string
@@ -1101,7 +1097,10 @@ def read_statefile(filename) :
     while flag :
       state.append(list)
       flag,list = read_booleans(f)
-  return np.array(state,dtype=np.uint8)
+  if every == 1 :
+    return np.array(state,dtype=np.uint8)
+  else :
+    return np.array(state,dtype=np.uint8)[::every]
 
 def write_booleans(fileobj,list) :
   """

@@ -14,7 +14,7 @@ import sys
 
 import numpy as np
 
-import pdb
+from sgenlib import pdb
 
 def _readconv(filename,fro,to) :
 

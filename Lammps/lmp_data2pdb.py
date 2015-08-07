@@ -14,15 +14,9 @@ import sys
 
 import numpy as np
 
-import lammps
-
-# Import the PDB and PBC module
-thispath = os.path.dirname(os.path.abspath(__file__))
-oneup = os.path.split(thispath)[0]
-sys.path.insert(0,os.path.join(oneup,"Pdb"))
-sys.path.insert(0,os.path.join(oneup,"Lib"))
-import pdb
-import pbc
+from sgenlib import lammps
+from sgenlib import pdb
+from sgenlib import pbc
 
 class AtomSelection :
   """

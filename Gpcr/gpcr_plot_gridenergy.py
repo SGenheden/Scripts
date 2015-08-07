@@ -21,11 +21,7 @@ if not "DISPLAY" in os.environ or os.environ["DISPLAY"] == "" :
 import matplotlib.pylab as plt
 
 import  gpcr_lib
-# Import the Pdb and Gmx module
-thispath = os.path.dirname(os.path.abspath(__file__))
-oneup = os.path.split(thispath)[0]
-sys.path.insert(0,os.path.join(oneup,"Gromacs"))
-import gmx
+from sgenlib import gmx
 
 def _writeDX(grid,origin,spacing,filename) :
   f = open(filename, 'w')

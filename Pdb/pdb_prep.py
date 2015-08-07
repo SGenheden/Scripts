@@ -26,7 +26,7 @@ import logging
 import numpy as np
 from scipy.spatial.distance import cdist
 
-from pdb import *
+from sgenlib.pdb import *
 
 
 # ------------------
