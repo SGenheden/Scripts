@@ -18,17 +18,27 @@ import numpy as np
 
 from sgenlib import lammps
 from sgenlib import pdb
+from sgenlib import geo
 
-def _center_solute(solute_data,zcent) :
-
-  # Center the solute in the membrane
-  center = np.array([0.0,0.0,zcent])
+def _center_solute(solute_data,center) :
+ 
+  center = np.array(center)
   solutecenter = np.zeros(3)
   for atom in solute_data.atoms :
     solutecenter = solutecenter + atom.xyz
   diff = solutecenter / float(len(solute_data.atoms)) - center
   for atom in solute_data.atoms :
     atom.set_xyz(atom.xyz-diff)
+ 
+def _center_solute_z(solute_data,zcent) :
+ 
+  _center_solute(solute_data,[0.0,0.0,zcent])
+
+def _rotate_solute(solute_data):
+
+  coords = geo.rotate_coords(np.asarray([atom.xyz for atom in solute_data.atoms]))
+  for i,atom in enumerate(solute_data.atoms) :   
+    atom.set_xyz(tuple(coords[i,:]))
 
 if __name__ == '__main__' :
 
@@ -43,10 +53,13 @@ if __name__ == '__main__' :
   parser.add_argument('--resize',help="resize box to fit solutes",action="store_true",default=False)
   parser.add_argument('-t','--type',choices=["cg2","cg1","aa"],help="the type of LAMMPS box, should be either 'cg2','cg1', 'aa'",default="cg1")
   parser.add_argument('-z','--zcent',nargs="+",type=float,help="the z-coordinate that the solute will be inserted at")
+  parser.add_argument('--center',action="store_true",help="center the solute in the box",default=False)
+  parser.add_argument('--rotate',action="store_true",help="rotate the solute in the box",default=False)
   parser.add_argument('--pairfunc',help="the pair function for the solute",default="lj/charmm/coul/long")
   parser.add_argument('--dihfunc',help="the dihedral function for the solute")
   parser.add_argument('--dihfunc_box',help="the dihedral function for the box")
   parser.add_argument('--pairmix',nargs="+",help="pair functions to use when mixing pairs")
+  parser.add_argument('--noff',action="store_true",help="turns off the creating of force field file",default=False)
   args = parser.parse_args()
 
   # Read solute data file
@@ -91,20 +104,21 @@ if __name__ == '__main__' :
   box_ff.extend_from_data(solute_data,lj_hybrid=-1,lj_func=args.pairfunc,lj_hybrid_mix=lj_hybrid,lj_func_mix=lj_func,ang_func="harmonic",dih_func=args.dihfunc)
 
   # Write a new force field file
-  box_ff.write("forcefield."+args.out)
+  if not args.noff : box_ff.write("forcefield."+args.out)
 
   # Combine the solute and box, put the solute at the end
   box_data.extend(solute_data)
   for atom in box_data.atoms :
     atom.kind = "cg/aa"
 
+
+  xyz = np.zeros([len(box_data.atoms),3])
+  for i,atom in enumerate(box_data.atoms) :
+    xyz[i,:] = atom.xyz
+  minxyz = xyz.min(axis=0)
+  maxxzy  = xyz.max(axis=0)
+
   if args.resize :
-    xyz = np.zeros([len(box_data.atoms),3])
-    for i,atom in enumerate(box_data.atoms) :
-      xyz[i,:] = atom.xyz
-    minxyz = xyz.min(axis=0)
-    maxxzy  = xyz.max(axis=0)
-  
     box_data.box[0] = minxyz[0]-2
     box_data.box[1] = minxyz[1]-2
     box_data.box[2] = minxyz[2]
@@ -113,9 +127,13 @@ if __name__ == '__main__' :
     box_data.box[5] = maxxzy[2]
 
   if args.zcent is None :
+    if args.center :
+      _center_solute(solute_data,minxyz+(maxxzy-minxyz)/2.0)
+    if args.rotate :
+      _rotate_solute(solute_data)
     box_data.write("data."+args.out)
   else :
     for z in args.zcent :
-      _center_solute(solute_data,z)
-      box_data.write("data."+args.out+"_z%0.f"%z)      
+      _center_solute_z(solute_data,z)
+      box_data.write("data."+args.out+"_z%0.f"%z)          
   

@@ -192,6 +192,30 @@ def principalAxes(moi):
   indices = np.argsort(eigenval)
   return eigenvec[:,indices].T
 
+def rotate_coords(coords,angles=None):
+    """
+    Rotate coordinates using Euler angles
+    """
+    if angles is None :
+        angles = [np.random.uniform(-np.pi,np.pi),
+                    np.random.uniform(0,np.pi),
+                    np.random.uniform(-np.pi,np.pi)]
+
+    # pich - roll - yawn convention
+    X =  np.mat([[1.0, 0.0, 0.0],
+                    [0.0, np.cos(angles[0]), np.sin(angles[0])],
+                    [0.0, -np.sin(angles[0]), np.cos(angles[0])]])
+    Y = np.mat([[np.cos(angles[1]), 0.0, -np.sin(angles[1])],
+                    [0.0, 1.0, 0.0],
+                    [np.sin(angles[1]), 0.0, np.cos(angles[1])]])
+    Z = np.mat([[np.cos(angles[2]), np.sin(angles[2]),0.0],
+                    [-np.sin(angles[2]), np.cos(angles[2]),0.0],
+                    [0.0, 0.0, 1.0]])
+
+    newmat = np.mat(coords-coords.mean(axis=0)).T
+    rotated = Z*Y*X*newmat
+    return np.asarray(rotated.T + np.mean(coords,axis=0))	
+
 def rotaxis(a,b):
   """
   Rotates a vector around an axis
