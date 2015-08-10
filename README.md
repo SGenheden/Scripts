@@ -16,4 +16,4 @@ export PYTHONPATH=$PYTHONPATH:$SCRIPTS
 
 It is recommended to put this is in a source file, e.g. `.bashrc` that is loaded automatically. 
 
-Lastly, the code without any sort of support. If you find a bug, please add an issue report here on GitHub.
+Lastly, the code comes without any sort of support. If you find a bug, please add an issue report here on GitHub.
