@@ -1,7 +1,7 @@
 Scripts
 =======
 
-This repository contains various python programs and packages created to fulfill the needs for various research projects. As such, they come with any sort of warranty. Admittedly they have been sparsely tested.
+This repository contains various python programs and packages created to fulfill the needs for various research projects. As such, they come without any sort of warranty. Admittedly they have been sparsely tested.
 
 They were written to be used with python version 2.7 and requires the following packages 
 * [numpy](http://www.numpy.org/)
@@ -15,3 +15,5 @@ export PYTHONPATH=$PYTHONPATH:$SCRIPTS
 ```
 
 It is recommended to put this is in a source file, e.g. `.bashrc` that is loaded automatically. 
+
+Lastly, the code without any sort of support. If you find a bug, please add an issue report here on GitHub.
