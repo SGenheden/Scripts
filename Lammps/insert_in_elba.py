@@ -21,7 +21,7 @@ from sgenlib import pdb
 from sgenlib import geo
 
 def _center_solute(solute_data,center) :
- 
+
   center = np.array(center)
   solutecenter = np.zeros(3)
   for atom in solute_data.atoms :
@@ -29,15 +29,15 @@ def _center_solute(solute_data,center) :
   diff = solutecenter / float(len(solute_data.atoms)) - center
   for atom in solute_data.atoms :
     atom.set_xyz(atom.xyz-diff)
- 
+
 def _center_solute_z(solute_data,zcent) :
- 
+
   _center_solute(solute_data,[0.0,0.0,zcent])
 
 def _rotate_solute(solute_data):
 
   coords = geo.rotate_coords(np.asarray([atom.xyz for atom in solute_data.atoms]))
-  for i,atom in enumerate(solute_data.atoms) :   
+  for i,atom in enumerate(solute_data.atoms) :
     atom.set_xyz(tuple(coords[i,:]))
 
 if __name__ == '__main__' :
@@ -63,7 +63,7 @@ if __name__ == '__main__' :
   args = parser.parse_args()
 
   # Read solute data file
-  solute_data = lammps.Datafile(filename=args.solute) 
+  solute_data = lammps.Datafile(filename=args.solute)
   if args.pdb is not None :
     pdbfile = pdb.PDBFile(filename=args.pdb)
     for datom,patom in zip(solute_data.atoms,pdbfile.atoms) :
@@ -106,17 +106,15 @@ if __name__ == '__main__' :
   # Write a new force field file
   if not args.noff : box_ff.write("forcefield."+args.out)
 
+  xyz = np.asarray([atom.xyz for atom in box_data.atoms])
+  minxyz = xyz.min(axis=0)
+  maxxzy  = xyz.max(axis=0)
+  centerxyz = xyz.mean(axis=0)
+
   # Combine the solute and box, put the solute at the end
   box_data.extend(solute_data)
   for atom in box_data.atoms :
     atom.kind = "cg/aa"
-
-
-  xyz = np.zeros([len(box_data.atoms),3])
-  for i,atom in enumerate(box_data.atoms) :
-    xyz[i,:] = atom.xyz
-  minxyz = xyz.min(axis=0)
-  maxxzy  = xyz.max(axis=0)
 
   if args.resize :
     box_data.box[0] = minxyz[0]-2
@@ -135,5 +133,4 @@ if __name__ == '__main__' :
   else :
     for z in args.zcent :
       _center_solute_z(solute_data,z)
-      box_data.write("data."+args.out+"_z%0.f"%z)          
-  
+      box_data.write("data."+args.out+"_z%0.f"%z)
