@@ -20,20 +20,20 @@ def build_xyz(bndatm,angatm,dihedatm,blen,ang,dih) :
   """
   Build Cartesian coordinates from internal coordinates
   """
-  
+
   ang = ang*np.pi/180.0
   dih = dih*np.pi/180.0
   blen = blen
-  
+
   #print bndatm[0],bndatm[1],bndatm[2],angatm[0],angatm[1],angatm[2],dihedatm[0],dihedatm[1],dihedatm[2],dih,ang,blen
-  
+
   d1 = dihedatm - bndatm
   d2 = angatm   - bndatm
-  
+
   vy = vnorm(np.cross(d1,d2))
   vx = vnorm(np.cross(d2,vy))
   vz = vnorm(np.cross(vx,vy))
-  
+
   xbs= blen * np.sin(ang) * np.cos(dih)
   ybs = blen * np.sin(ang) * np.sin(dih)
   zbs = -blen * np.cos(ang)
@@ -85,19 +85,19 @@ def dihedral_protoms(a1,a2,a3,a4) :
   v23 = a3 - a2
   v32 = -v23
   v34 = a4 - a3
-  
+
   n1 = vnorm(np.cross(v21,v23))
   n2 = vnorm(np.cross(v32,v34))
-  
+
   phi = np.dot(n1,n2)
-  
+
   if phi > 1.0 :
     phi = 1
   elif phi < -1.0 :
     phi = -1
 
   phi = np.arccos(phi)
-  
+
   n3 = vnorm(np.cross(n1,v23))
   ang = np.dot(n2,n3)
   if ang > 1.0 :
@@ -105,11 +105,11 @@ def dihedral_protoms(a1,a2,a3,a4) :
   elif ang < -1 :
     ang = -1.0
   ang = np.arccos(ang)
-  
+
   if ang < np.pi/2.0 : phi = 2*np.pi-phi
-  
+
   return phi
-  
+
 def multi2RB(forces,multiplicities,phases) :
   """
   Converts a period dihedral angle to Ryckart-Bell dihedral
@@ -122,7 +122,7 @@ def multi2RB(forces,multiplicities,phases) :
     period = multiplicities[i]
     phase = phases[i]
 
-    if force > 0 : V[period] = 2*force 
+    if force > 0 : V[period] = 2*force
     if period == 1 :
       C[0] += 0.5 * V[period]
       if phase == 0:
@@ -151,7 +151,7 @@ def multi2RB(forces,multiplicities,phases) :
         C[0] += V[period]
         C[2] -= 4 * V[period]
         C[4] += 4 * V[period]
-  
+
   return C
 
 
@@ -161,7 +161,7 @@ def centerOfMass(xyz,masses) :
   """
   return np.sum(xyz*masses[:,np.newaxis],axis=0)/np.sum(masses)
 
-def momentOfInertia(xyz,masses):
+def moment_of_inertia(xyz,masses):
   """
   Calculates the moment of inertia of a set of coordinates
   """
@@ -183,7 +183,7 @@ def momentOfInertia(xyz,masses):
   Iyz = Izy = -1*reduce(lambda t,a: t+a[0]*a[1][1]*a[1][2], values, 0.)
   return np.array([[Ixx, Ixy, Ixz],[Iyx, Iyy, Iyz],[Izx, Izy, Izz]])
 
-def principalAxes(moi):
+def principal_axes(moi):
   """
   Calculates the principal axis of a moment of inertia vector
   """
@@ -214,7 +214,7 @@ def rotate_coords(coords,angles=None):
 
     newmat = np.mat(coords-coords.mean(axis=0)).T
     rotated = Z*Y*X*newmat
-    return np.asarray(rotated.T + np.mean(coords,axis=0))	
+    return np.asarray(rotated.T + np.mean(coords,axis=0))
 
 def rotaxis(a,b):
   """
@@ -249,12 +249,12 @@ def rotation_matrix(angle, direction, point=None):
   return M
 
 def vlen3(vec) :
-  return np.sqrt((vec**2).sum())  
+  return np.sqrt((vec**2).sum())
 
 def majorminor_axis(xyz) :
-  
+
   def posneg_vec(vec1,vec2,posvec,negvec,npos,nneg,vlen_flag) :
-  
+
     vlen = vlen3(vec1)*vlen3(vec2)
     vec = (vec1*vec2).sum()
     #if vlen_flag == 1 :
@@ -273,14 +273,14 @@ def majorminor_axis(xyz) :
     return posvec,negvec,npos,nneg
 
   def assign_vec(posvec,negvec,npos,nneg) :
-  
+
     vec = np.zeros(3)
     if npos > 0 : posvec = posvec / float(npos)
     if nneg > 0 : negvec = negvec / float(nneg)
-  
+
     poslen2 = (posvec**2).sum()
     neglen2 = (negvec**2).sum()
-  
+
     if poslen2 > neglen2 :
       if poslen2 != 0.0 :
         vec = vnorm(posvec)
@@ -292,11 +292,11 @@ def majorminor_axis(xyz) :
       else :
         vec[0] = 1.0
     return vec
-  
+
   center = xyz.mean(axis=0)
   major = np.zeros(3)
   minor_tmp = np.zeros(3)
-  
+
   # Major axis
   posvec = np.zeros(3)
   negvec = np.zeros(3)
@@ -305,8 +305,8 @@ def majorminor_axis(xyz) :
   for i in range(xyz.shape[0]) :
     vec = xyz[i,:] - center
     posvec,negvec,npos,nneg = posneg_vec(np.array([1.0,0.0,0.0]),vec,posvec,negvec,npos,nneg,1)
-  
-  major = assign_vec(posvec,negvec,npos,nneg)  
+
+  major = assign_vec(posvec,negvec,npos,nneg)
 
   # Minor axis
   posvec = np.zeros(3)
@@ -316,17 +316,17 @@ def majorminor_axis(xyz) :
   for i in range(xyz.shape[0]) :
     vec = xyz[i,:] - center
     posvec,negvec,npos,nneg = posneg_vec(major,vec,posvec,negvec,npos,nneg,0)
-    
+
   minor_tmp = assign_vec(posvec,negvec,npos,nneg)
 
   majlen2 = (major**2).sum()
   minlen2 = (minor_tmp**2).sum()
-   
+
   if majlen2 < 1E-10 :
     major = np.array([1.0,0.0,0.0])
   elif minlen2 < 1E-10 :
     minor_tmp = np.array([0.0,1.0,0.0])
-    
+
   if minlen2 > majlen2 :
     temp = np.array(major,copy=True)
     major = np.array(minor_tmp,copy=True)
@@ -345,5 +345,5 @@ def majorminor_axis(xyz) :
     beta = np.sqrt(beta)
     minor = (minor - (alpha*major)) / beta
     minor = vnorm(minor)
-    
+
   return major,minor
