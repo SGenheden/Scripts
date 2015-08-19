@@ -15,7 +15,8 @@ def stdin2ndarray() :
     """
     data = []
     for line in fileinput.input() :
-        data.append(line.strip().split())
+        if line[0] not in ["#","@"] :
+            data.append(line.strip().split())
 
     return np.array(data,dtype=float)
 
