@@ -15,7 +15,7 @@ import numpy as np
 
 from sgenlib import moldyn
 
-class IredAnalysis(moldyn.AnalysisAction):
+class IredAnalysis(moldyn.TrajectoryAction):
     """
     Analysis class for iRED
 
@@ -91,15 +91,17 @@ class IredAnalysis(moldyn.AnalysisAction):
             for i,(atm,rs2) in enumerate(zip(self.atm1,self.s2list.T)):
                 f.write("%d %.5f\n"%(i,rs2.mean()))
 
+    @classmethod
+    def add_arguments(cls,processor):
+        processor.argparser.add_argument('--atoms',nargs=2,help="the atom names making the vectors",default=["N","H"])
+        processor.argparser.add_argument('--pmask',help="the selectiom mask for protein",default="protein")
+        processor.argparser.add_argument('-o','--out',help="the output name",default="s2.txt")
 
 if __name__ == '__main__' :
 
-    #print " ".join(sys.argv)
     processor = moldyn.TrajectoryProcessor("Calculate the iRED order parameters",
                     dosubsample=True)
-    processor.argparser.add_argument('--atoms',nargs=2,help="the atom names making the vectors",default=["N","H"])
-    processor.argparser.add_argument('--pmask',help="the selectiom mask for protein",default="protein")
-    processor.argparser.add_argument('-o','--out',help="the output name",default="s2.txt")
+    IredAnalysis.add_arguments(processor)
     processor.setup()
 
     analysis = IredAnalysis(processor)

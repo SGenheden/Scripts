@@ -53,14 +53,6 @@ coverage.xml
 docs/_build/
 
 
-acpype.py
-charge_corr_scripts/*
-Depracted/*
-Dgtools/*
-Dgtools2/*
-Gmx_test/*
-MDAnalysis/*
+Deprecated/*
 Proj-fragments/*
 Proj-inla/*
-
-

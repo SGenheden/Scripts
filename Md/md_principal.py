@@ -19,7 +19,7 @@ from sgenlib import pbc
 from sgenlib import geo
 from sgenlib import moldyn
 
-class PrincipalAxisAnalysis(moldyn.AnalysisAction):
+class PrincipalAxisAnalysis(moldyn.TrajectoryAction):
     """
     Class to analyse the principcal axis and its angle
 
@@ -59,14 +59,17 @@ class PrincipalAxisAnalysis(moldyn.AnalysisAction):
         print "Mean = %.3f Std = %.3f"%(alphas.mean(),alphas.std())
         self._write_records()
 
+    @classmethod
+    def add_arguments(cls,processor):
+        processor.argparser.add_argument('-m','--mask',help="the selectiom mask",default="name CA")
+        processor.argparser.add_argument('-n','--normal',type=float,nargs=3,help="the normal vector",default=[0.0,0.0,1.0])
+        processor.argparser.add_argument('-o','--out',help="the output filename",default="alpha.txt")
+
 if __name__ == '__main__' :
 
-    print " ".join(sys.argv)
     processor = moldyn.TrajectoryProcessor("Calculte the principcal axis of a molecule and it angles with an axis")
-    processor.argparser.add_argument('-m','--mask',help="the selectiom mask",default="name CA")
-    processor.argparser.add_argument('-n','--normal',type=float,nargs=3,help="the normal vector",default=[0.0,0.0,1.0])
-    processor.argparser.add_argument('-o','--out',help="the output filename",default="alpha.txt")
-    processor.setup()
+    PrincipalAxisAnalysis.add_arguments(processor)
+    processor.setup(printargs=True)
 
     analysis = PrincipalAxisAnalysis(processor)
     processor.process()

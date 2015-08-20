@@ -16,7 +16,7 @@ import numpy as np
 
 from sgenlib import moldyn
 
-class MempropAnalysis(moldyn.AnalysisAction):
+class MempropAnalysis(moldyn.TrajectoryAction):
     def __init__(self,processor):
         super(MempropAnalysis,self).__init__(processor)
         self.outname = processor.args.out
@@ -65,15 +65,18 @@ class MempropAnalysis(moldyn.AnalysisAction):
         with open(self.outname,"w") as f :
             f.write("%.3f\t%.3f\t%.3f\n"%(apl,vpl,dhh))
 
+    @classmethod
+    def add_arguments(cls,processor):
+        processor.argparser.add_argument('--pmask',help="the selectiom mask for phosphor atoms",default="name P")
+        processor.argparser.add_argument('--lipidmask',help="the selectiom mask for lipid residues",default="resname POPC")
+        processor.argparser.add_argument('--watmask',help="the selectiom mask for water residues",default="resname SOL")
+        processor.argparser.add_argument('--watvol',type=float,help="the volume of a water molecule in nm3",default=0.0306)
+        processor.argparser.add_argument('-o','--out',help="the output filename",default="memprop.txt")
+
 if __name__ == '__main__' :
 
-    #print " ".join(sys.argv)
     processor = moldyn.TrajectoryProcessor("Calculate membrane properties")
-    processor.argparser.add_argument('--pmask',help="the selectiom mask for phosphor atoms",default="name P")
-    processor.argparser.add_argument('--lipidmask',help="the selectiom mask for lipid residues",default="resname POPC")
-    processor.argparser.add_argument('--watmask',help="the selectiom mask for water residues",default="resname SOL")
-    processor.argparser.add_argument('--watvol',type=float,help="the volume of a water molecule in nm3",default=0.0306)
-    processor.argparser.add_argument('-o','--out',help="the output filename",default="memprop.txt")
+    MempropAnalysis.add_arguments(processor)
     processor.setup()
 
     analysis = MempropAnalysis(processor)

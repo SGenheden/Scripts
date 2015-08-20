@@ -17,7 +17,7 @@ import numpy as np
 
 from sgenlib import moldyn
 
-class RMSFAnalysis(moldyn.AnalysisAction):
+class RMSFAnalysis(moldyn.TrajectoryAction):
     """
     Class to analyse the RMSF of selected residues
 
@@ -66,14 +66,17 @@ class RMSFAnalysis(moldyn.AnalysisAction):
                     masssum += atom.mass
                 f.write("%d %.3f\n"%(residue.id,rbfac / masssum))
 
+    @classmethod
+    def add_arguments(cls,processor):
+        processor.argparser.add_argument('--atoms',nargs="+",help="the atom names in the  backbone",default=["CA","N","C"])
+        processor.argparser.add_argument('--pmask',help="the selectiom mask for protein",default="protein")
+        processor.argparser.add_argument('-o','--out',help="the output",default="rmsf.txt")
+
 if __name__ == '__main__' :
 
-    print " ".join(sys.argv)
     processor = moldyn.TrajectoryProcessor("Calculate the bfactor of atoms")
-    processor.argparser.add_argument('--atoms',nargs="+",help="the atom names in the  backbone",default=["CA","N","C"])
-    processor.argparser.add_argument('--pmask',help="the selectiom mask for protein",default="protein")
-    processor.argparser.add_argument('-o','--out',help="the output",default="rmsf.txt")
-    processor.setup()
+    RMSFAnalysis.add_arguments(processor)
+    processor.setup(printargs=True)
 
     analysis = RMSFAnalysis(processor)
     processor.process()

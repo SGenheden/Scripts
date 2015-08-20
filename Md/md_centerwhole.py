@@ -27,7 +27,7 @@ from sgenlib import moldyn
 
 ResidueAtoms = namedtuple("ResidueAtoms",["first","last"])
 
-class CenterWholeAlign(moldyn.AnalysisAction):
+class CenterWholeAlign(moldyn.TrajectoryAction):
     """
     Class to make MD snapshots whole over periodic boxes and to centre and
     align proteins.
@@ -101,17 +101,19 @@ class CenterWholeAlign(moldyn.AnalysisAction):
         delta = com1 - self.processor.currbox/2.0
         xyz = xyz - delta
 
+    @classmethod
+    def add_arguments(cls,processor):
+        processor.argparser.add_argument('--bbmask',help="the selectiom mask for backbone",default="name CA")
+        processor.argparser.add_argument('--pmask',help="the selectiom mask for protein",default="protein")
+        processor.argparser.add_argument('-o','--out',help="the output",default="centerwhole")
+        processor.argparser.add_argument('--noalign',action="store_true",help="turns off alignment",default=False)
+        processor.argparser.add_argument('--nocenter',action="store_true",help="turns off centering",default=False)
+
 if __name__ == '__main__' :
 
-  print " ".join(sys.argv)
-
   processor = moldyn.TrajectoryProcessor("Center and make a trajectory whole")
-  processor.argparser.add_argument('--bbmask',help="the selectiom mask for backbone",default="name CA")
-  processor.argparser.add_argument('--pmask',help="the selectiom mask for protein",default="protein")
-  processor.argparser.add_argument('-o','--out',help="the output",default="centerwhole")
-  processor.argparser.add_argument('--noalign',action="store_true",help="turns off alignment",default=False)
-  processor.argparser.add_argument('--nocenter',action="store_true",help="turns off centering",default=False)
-  processor.setup()
+  CenterWholeAlign.add_arguments(processor)
+  processor.setup(printargs=True)
 
   analysis = CenterWholeAlign(processor)
   processor.process()

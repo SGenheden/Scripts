@@ -20,13 +20,13 @@ class TrajectoryProcessor(object):
     that parse the arguments and initialises the md universe object
 
     To analyse the trajectory the program then calls the process() routine that
-    calles AnalysisAction objects in the analyses list. These objects needs to
+    calles TrajectoryAction objects in the actions list. These objects needs to
     be initiated before a call to process().
 
     Attributes
     ----------
-    analyses : list of AnalysisAction objects
-        the analyses to call
+    actions : list of TrajectoryAction objects
+        the actions to call
     argparser : argparse.ArgumentParser
         the command line argument parser
     args : argparse.Namespace
@@ -38,7 +38,7 @@ class TrajectoryProcessor(object):
     currsnap : MDAnalysis.TimeStep object
         the current snapshot
     dosubsample : boolean
-        if analyses doing subsampling
+        if actions doing subsampling
     dt : float
         the number of ps per snapshot
     every : int
@@ -62,7 +62,7 @@ class TrajectoryProcessor(object):
         self.argparser.add_argument('--every',type=int,help="print out every X frame",default=1)
         self.argparser.add_argument('--dt', type=float, help="the number of ps for each snapshot", default=10)
         if dosubsample:
-            self.argparser.add_argument('--freq',type=int,help="the analysis frequency",default=100000)
+            self.argparser.add_argument('--freq',type=int,help="the action frequency",default=100000)
         self.universe = None
         self.dosubsample=dosubsample
         self.currtime = 0
@@ -71,13 +71,15 @@ class TrajectoryProcessor(object):
         self.every = 0
         self.subsamples = 0
         self.freq = 0
-        self.analyses = []
+        self.actions = []
 
-    def setup(self):
+    def setup(self,printargs=False):
         """
         Parsing command-line arguments and setting up the MD universe
         This routine should be called before process()
         """
+        if printargs:
+            print " ".join(sys.argv)
         self.args = self.argparser.parse_args()
         self.skip = self.args.skip
         self.dt = self.args.dt
@@ -95,9 +97,9 @@ class TrajectoryProcessor(object):
     def process(self):
         """
         Loop over the MD trajectory and process it, calling the objects in
-        the analyses list
+        the actions list
         """
-        if self.universe is None or not self.analyses: return
+        if self.universe is None or not self.actions: return
 
         for ti, ts in enumerate(self.universe.trajectory,1):
             self.currsnap = ts
@@ -110,36 +112,48 @@ class TrajectoryProcessor(object):
                 continue
             if ti % self.every != 0 :
                 continue
-            for analysis in self.analyses:
-                analysis.process()
-                if self.dosubsample and analysis.dosubsample and \
-                        self.currtime % self.freq == 0:
-                    analysis.subsample()
+            self.call_actions()
 
         print ""
-        for analysis in self.analyses :
-            analysis.finalize()
+        for action in self.actions :
+            action.finalize()
+
+    def call_actions(self):
+        for action in self.actions:
+            action.process()
+            if self.dosubsample and action.dosubsample and \
+                    self.currtime % self.freq == 0:
+                action.subsample()
 
 MDRecord = namedtuple("MDRecord",["time","value"])
 
-class AnalysisAction(object):
+class TrajectoryAction(object):
     """
-    Base class for analysis actions that are called by a TrajectoryProcessor
-    object. Classes that wants to implement analysis a particular action
+    Base class for actions that are called by a TrajectoryProcessor
+    object. Classes that wants to implement a particular action
     should inherit from this.
     """
     def __init__(self,processor):
         self.processor = processor
         self.dosubsample = False
-        processor.analyses.append(self)
+        processor.actions.append(self)
 
     def process(self):
+        """
+        Main processing function called at each trajectory timestep
+        """
         pass
 
     def subsample(self):
+        """
+        Function called occasionally if subsampling is turned on
+        """
         pass
 
     def finalize(self):
+        """
+        Function that is called after all timesteps has been processed
+        """
         pass
 
     def _write_records(self,postfix=''):
@@ -150,3 +164,12 @@ class AnalysisAction(object):
             with open(self.processor.args.out+postfix,'w') as f :
                 for entry in self.records:
                     f.write("%.0f %.3f\n"%(entry.time,entry.value))
+
+    @classmethod
+    def add_arguments(cls,processor):
+        """
+        This class method should add action-specific arguments to
+        the argument parser before an object of the class is initialised
+        (which needs to be done after processor.setup() as been called)
+        """
+        pass
