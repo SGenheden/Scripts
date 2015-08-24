@@ -5,10 +5,11 @@ Classes to help with the processing of MD trajectories
 """
 
 import argparse
+import inspect
 import sys
-from collections import namedtuple
 
 import MDAnalysis as md
+from . import mdactions
 
 class TrajectoryProcessor(object):
     """
@@ -73,6 +74,16 @@ class TrajectoryProcessor(object):
         self.freq = 0
         self.actions = []
 
+        def pred(c) :
+          return inspect.isclass(c) and c.__module__ == "sgenlib.mdactions" and \
+                    issubclass(c,mdactions.TrajectoryAction) and \
+                    c.__name__ != "TrajectoryAction"
+        self.actionclasses = {name:c
+            for name,c in inspect.getmembers(sys.modules["sgenlib.mdactions"],pred)}
+
+    def add_argument(self,*args,**kwargs):
+        self.argparser.add_argument(*args,**kwargs)
+
     def setup(self,printargs=False):
         """
         Parsing command-line arguments and setting up the MD universe
@@ -80,6 +91,10 @@ class TrajectoryProcessor(object):
         """
         if printargs:
             print " ".join(sys.argv)
+
+        for action in self.actions:
+            action.add_arguments()
+
         self.args = self.argparser.parse_args()
         self.skip = self.args.skip
         self.dt = self.args.dt
@@ -88,6 +103,9 @@ class TrajectoryProcessor(object):
             self.freq = self.args.freq
             self.subsamples = self.freq/self.dt
         self.setup_universe()
+
+        for action in self.actions:
+            action.setup()
 
     def setup_universe(self):
         if self.args.file is None or self.args.struct is None :
@@ -124,52 +142,3 @@ class TrajectoryProcessor(object):
             if self.dosubsample and action.dosubsample and \
                     self.currtime % self.freq == 0:
                 action.subsample()
-
-MDRecord = namedtuple("MDRecord",["time","value"])
-
-class TrajectoryAction(object):
-    """
-    Base class for actions that are called by a TrajectoryProcessor
-    object. Classes that wants to implement a particular action
-    should inherit from this.
-    """
-    def __init__(self,processor):
-        self.processor = processor
-        self.dosubsample = False
-        processor.actions.append(self)
-
-    def process(self):
-        """
-        Main processing function called at each trajectory timestep
-        """
-        pass
-
-    def subsample(self):
-        """
-        Function called occasionally if subsampling is turned on
-        """
-        pass
-
-    def finalize(self):
-        """
-        Function that is called after all timesteps has been processed
-        """
-        pass
-
-    def _write_records(self,postfix=''):
-        """
-        Helper routine to write out a list of MDRecord to disc
-        """
-        if self.records :
-            with open(self.processor.args.out+postfix,'w') as f :
-                for entry in self.records:
-                    f.write("%.0f %.3f\n"%(entry.time,entry.value))
-
-    @classmethod
-    def add_arguments(cls,processor):
-        """
-        This class method should add action-specific arguments to
-        the argument parser before an object of the class is initialised
-        (which needs to be done after processor.setup() as been called)
-        """
-        pass
