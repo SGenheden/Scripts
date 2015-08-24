@@ -1,3 +1,8 @@
+# Author: Samuel Genheden samuel.genheden@gmail.com
+
+"""
+Classes to perform actions on MD trajectories
+"""
 
 from collections import namedtuple
 
@@ -16,7 +21,7 @@ class TrajectoryAction(object):
     object. Classes that wants to implement a particular action
     should inherit from this.
     """
-    def __init__(self,processor):
+    def __init__(self, processor):
         self.processor = processor
         self.dosubsample = False
         processor.actions.append(self)
@@ -24,13 +29,23 @@ class TrajectoryAction(object):
     def add_arguments(self):
         """
         Function that is called to add action-specific arguments
+
+        Arguments
+        ---------
+        parser : argparse.ArgumentParser
+            the parser to add command-line arguments to
         """
         pass
 
-    def setup(self):
+    def setup(self, args):
         """
         Function that is called after the processor has parsed the command-line
         arguments.
+
+        Arguments
+        ---------
+        args : argparse.Namespace
+            the parsed arguments
         """
 
     def process(self):
@@ -56,7 +71,7 @@ class TrajectoryAction(object):
         Helper routine to write out a list of MDRecord to disc
         """
         if self.records :
-            with open(self.processor.args.out+postfix,'w') as f :
+            with open(self.out+postfix,'w') as f :
                 for entry in self.records:
                     f.write("%.0f %.3f\n"%(entry.time,entry.value))
 
@@ -83,30 +98,35 @@ class CenterWholeAlign(TrajectoryAction):
     writer : MDAnalysis.Writer
         the output trajectory writer
     """
-    def add_arguments(self):
-        self.processor.add_argument('--bbmask',help="the selectiom mask for backbone",default="name CA")
-        self.processor.add_argument('--pmask',help="the selectiom mask for protein",default="protein")
-        self.processor.add_argument('-o','--out',help="the output",default="centerwhole")
-        self.processor.add_argument('--noalign',action="store_true",help="turns off alignment",default=False)
-        self.processor.add_argument('--nocenter',action="store_true",help="turns off centering",default=False)
+    def add_arguments(self, parser):
+        parser.add_argument('--bbmask',help="the selectiom mask for backbone",default="name CA")
+        parser.add_argument('--pmask',help="the selectiom mask for protein",default="protein")
+        parser.add_argument('-o','--out',help="the output",default="centerwhole")
+        parser.add_argument('--noalign',action="store_true",help="turns off alignment",default=False)
+        parser.add_argument('--nocenter',action="store_true",help="turns off centering",default=False)
 
-    def setup(self):
+    def setup(self, args):
         self.refuni = md.Universe(self.processor.args.struct)
-        self.protsel = self.processor.universe.selectAtoms(self.processor.args.pmask)
+        self.protsel = self.processor.universe.selectAtoms(args.pmask)
         if len(self.protsel) == 0 :
-            self.processor.args.nocenter = True
-            self.processor.args.noalign = True
+            self.nocenter = True
+            self.noalign = True
+        else:
+            self.nocenter = args.nocenter
+            self.noalign = args.noalign
 
         self.residues = []
         self.residue_atoms = []
-        for res in self.processor.universe.selectAtoms("not "+self.processor.args.pmask).residues:
+        for res in self.processor.universe.selectAtoms("not "+args.pmask).residues:
             if len(res) > 1 :
                 self.residues.append(res)
             self.residue_atoms.append(ResidueAtoms(res[0].number,res[-1].number))
 
         self.records = []
-        self.writer = md.Writer(self.processor.args.out+".dcd",
+        self.writer = md.Writer(args.out+".dcd",
                                     self.processor.universe.trajectory.numatoms)
+        self.out = args.out
+        self.bbmask = args.bbmask
 
     def process(self):
         if len(self.protsel) > 0:
@@ -115,11 +135,11 @@ class CenterWholeAlign(TrajectoryAction):
         for res in self.residues :
             xyz = pbc.make_whole_xyz(res.get_positions(),self.processor.currbox)
             res.set_positions(xyz)
-        if not self.processor.args.nocenter :
+        if not self.nocenter :
             self._center()
-        if not self.processor.args.noalign :
+        if not self.noalign :
             rmsd = align.alignto(self.processor.universe, self.refuni,
-                                select=self.processor.args.bbmask)[1]
+                                select=self.bbmask)[1]
             self.records.append(MDRecord(self.processor.currtime,rmsd))
 
         self.writer.write(self.processor.currsnap)
@@ -162,19 +182,19 @@ class IredAnalysis(TrajectoryAction):
     processor : TrajectoryProcessor object
         the trajectory processor calling this analysis
     """
-    def add_arguments(self):
-        self.processor.add_argument('--atoms',nargs=2,help="the atom names making the vectors",default=["N","H"])
-        self.processor.add_argument('--pmask',help="the selectiom mask for protein",default="protein")
-        self.processor.add_argument('-o','--out',help="the output name",default="s2.txt")
+    def add_arguments(self, parser):
+        parser.add_argument('--atoms',nargs=2,help="the atom names making the vectors",default=["N","H"])
+        parser.add_argument('--pmask',help="the selectiom mask for protein",default="protein")
+        parser.add_argument('-o','--out',help="the output name",default="s2.txt")
 
-    def setup(self):
-        protsel = self.processor.universe.selectAtoms(self.processor.args.pmask)
-        self.atm2 = protsel.selectAtoms("name "+self.processor.args.atoms[1])
-        self.atm1 = protsel.selectAtoms("name "+self.processor.args.atoms[0]+
-                                        " and byres name "+self.processor.args.atoms[1])
+    def setup(self,args):
+        protsel = self.processor.universe.selectAtoms(args.pmask)
+        self.atm2 = protsel.selectAtoms("name "+args.atoms[1])
+        self.atm1 = protsel.selectAtoms("name "+args.atoms[0]+
+                                        " and byres name "+args.atoms[1])
         self.mat = np.zeros([len(self.atm1),len(self.atm1)])
         self.s2list = []
-        self.outname = self.processor.args.out
+        self.outname = args.out
         self.dosubsample = True
 
     def process(self):
@@ -224,21 +244,21 @@ class IredAnalysis(TrajectoryAction):
                 f.write("%d %.5f\n"%(i,rs2.mean()))
 
 class MempropAnalysis(TrajectoryAction):
-    def add_arguments(self):
-        self.processor.add_argument('--pmask',help="the selectiom mask for phosphor atoms",default="name P")
-        self.processor.add_argument('--lipidmask',help="the selectiom mask for lipid residues",default="resname POPC")
-        self.processor.add_argument('--watmask',help="the selectiom mask for water residues",default="resname SOL")
-        self.processor.add_argument('--watvol',type=float,help="the volume of a water molecule in nm3",default=0.0306)
-        self.processor.add_argument('-o','--out',help="the output filename",default="memprop.txt")
+    def add_arguments(self, parser):
+        parser.add_argument('--pmask',help="the selectiom mask for phosphor atoms",default="name P")
+        parser.add_argument('--lipidmask',help="the selectiom mask for lipid residues",default="resname POPC")
+        parser.add_argument('--watmask',help="the selectiom mask for water residues",default="resname SOL")
+        parser.add_argument('--watvol',type=float,help="the volume of a water molecule in nm3",default=0.0306)
+        parser.add_argument('-o','--out',help="the output filename",default="memprop.txt")
 
-    def setup(self):
-        self.outname = self.processor.args.out
-        self.phosphorsel = self.processor.universe.selectAtoms(self.processor.args.pmask)
-        self.lipidsel = self.processor.universe.selectAtoms(self.processor.args.lipidmask)
-        watsel  = self.processor.universe.selectAtoms(self.processor.args.watmask)
+    def setup(self,args):
+        self.outname = args.out
+        self.phosphorsel = self.processor.universe.selectAtoms(args.pmask)
+        self.lipidsel = self.processor.universe.selectAtoms(args.lipidmask)
+        watsel  = self.processor.universe.selectAtoms(args.watmask)
         self.nlipid = len(self.lipidsel.residues)
         self.nwat = len(watsel.residues)
-        self.watvol = self.processor.args.watvol
+        self.watvol = args.watvol
         nphosph = len(self.phosphorsel.residues)
         if self.nlipid == 0 or self.nwat == 0 or nphosph == 0 :
             raise Exception("Either number of lipids (%d), water (%d) or phosphor atoms (%d)  is zero"%(self.nlipid,self.nwat,nphosph))
@@ -294,16 +314,17 @@ class PrincipalAxisAnalysis(TrajectoryAction):
     selection : MDAnalysis.AtomGroup
         the selection to make the analysis of
     """
-    def add_arguments(self):
-        self.processor.add_argument('-m','--mask',help="the selectiom mask",default="name CA")
-        self.processor.add_argument('-n','--normal',type=float,nargs=3,help="the normal vector",default=[0.0,0.0,1.0])
-        self.processor.add_argument('-o','--out',help="the output filename",default="alpha.txt")
+    def add_arguments(self, parser):
+        parser.add_argument('-m','--mask',help="the selectiom mask",default="name CA")
+        parser.add_argument('-n','--normal',type=float,nargs=3,help="the normal vector",default=[0.0,0.0,1.0])
+        parser.add_argument('-o','--out',help="the output filename",default="alpha.txt")
 
-    def setup(self):
-        self.selection = self.processor.universe.selectAtoms(self.processor.args.mask)
+    def setup(self,args):
+        self.selection = self.processor.universe.selectAtoms(args.mask)
         self.masses = np.asarray([atom.mass for atom in self.selection])
-        self.normal = np.asarray(self.processor.args.normal)
+        self.normal = np.asarray(args.normal)
         self.records = []
+        self.out = args.out
 
     def process(self):
         xyz = pbc.make_whole_xyz(self.selection.get_positions(),
@@ -340,18 +361,20 @@ class RMSFAnalysis(TrajectoryAction):
     sumcoords2 : numpy.ndarray
         the accumulated square of the system coordinates
     """
-    def add_arguments(self):
-        self.processor.add_argument('--atoms',nargs="+",help="the atom names in the  backbone",default=["CA","N","C"])
-        self.processor.add_argument('--pmask',help="the selectiom mask for protein",default="protein")
-        self.processor.add_argument('-o','--out',help="the output",default="rmsf.txt")
+    def add_arguments(self, parser):
+        parser.add_argument('--atoms',nargs="+",help="the atom names in the  backbone",default=["CA","N","C"])
+        parser.add_argument('--pmask',help="the selectiom mask for protein",default="protein")
+        parser.add_argument('-o','--out',help="the output",default="rmsf.txt")
 
-    def setup(self):
+    def setup(self, args):
         self.refuni = md.Universe(self.processor.args.struct)
-        self.protsel = self.processor.universe.selectAtoms(self.processor.args.pmask)
-        self.alignmask = "%s"%(" or ".join("name %s"%a for a in self.processor.args.atoms))
+        self.protsel = self.processor.universe.selectAtoms(args.pmask)
+        self.atoms = args.atoms
+        self.alignmask = "%s"%(" or ".join("name %s"%a for a in args.atoms))
         natm = len(self.processor.universe.atoms)
         self.sumcoords2 = np.zeros([natm,3])
         self.sumcoords = np.zeros([natm,3])
+        self.out = args.out
 
     def process(self):
         rmsd = align.alignto(self.processor.universe, self.refuni, select=self.alignmask)
@@ -366,12 +389,12 @@ class RMSFAnalysis(TrajectoryAction):
         var = self.sumcoords2 - (self.sumcoords * self.sumcoords)
         bfac = (8.0/3.0)*np.pi*np.pi*var.sum(axis=1)
 
-        with open(self.processor.args.out,'w') as f:
+        with open(self.out,'w') as f:
             for residue in self.protsel.residues:
                 rbfac = 0.0
                 masssum = 0.0
                 for atom in residue:
-                    if atom.name not in self.processor.args.atoms : continue
+                    if atom.name not in self.atoms : continue
                     rbfac = bfac[atom.number]*atom.mass
                     masssum += atom.mass
                 f.write("%d %.3f\n"%(residue.id,rbfac / masssum))

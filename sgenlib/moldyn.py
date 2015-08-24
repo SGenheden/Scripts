@@ -5,11 +5,9 @@ Classes to help with the processing of MD trajectories
 """
 
 import argparse
-import inspect
 import sys
 
 import MDAnalysis as md
-from . import mdactions
 
 class TrajectoryProcessor(object):
     """
@@ -62,8 +60,10 @@ class TrajectoryProcessor(object):
         self.argparser.add_argument('--skip', type=int, help="skip this many snapshots", default=0)
         self.argparser.add_argument('--every',type=int,help="print out every X frame",default=1)
         self.argparser.add_argument('--dt', type=float, help="the number of ps for each snapshot", default=10)
+        self._argnames = ["file","struct","skip","every","dt"]
         if dosubsample:
             self.argparser.add_argument('--freq',type=int,help="the action frequency",default=100000)
+            self._argnames.append("freq")
         self.universe = None
         self.dosubsample=dosubsample
         self.currtime = 0
@@ -74,17 +74,7 @@ class TrajectoryProcessor(object):
         self.freq = 0
         self.actions = []
 
-        def pred(c) :
-          return inspect.isclass(c) and c.__module__ == "sgenlib.mdactions" and \
-                    issubclass(c,mdactions.TrajectoryAction) and \
-                    c.__name__ != "TrajectoryAction"
-        self.actionclasses = {name:c
-            for name,c in inspect.getmembers(sys.modules["sgenlib.mdactions"],pred)}
-
-    def add_argument(self,*args,**kwargs):
-        self.argparser.add_argument(*args,**kwargs)
-
-    def setup(self,printargs=False):
+    def setup(self,printargs=False,action_arguments=[]):
         """
         Parsing command-line arguments and setting up the MD universe
         This routine should be called before process()
@@ -92,8 +82,8 @@ class TrajectoryProcessor(object):
         if printargs:
             print " ".join(sys.argv)
 
-        for action in self.actions:
-            action.add_arguments()
+        for i, action in enumerate(self.actions):
+            action.add_arguments(self.argparser)
 
         self.args = self.argparser.parse_args()
         self.skip = self.args.skip
@@ -104,8 +94,10 @@ class TrajectoryProcessor(object):
             self.subsamples = self.freq/self.dt
         self.setup_universe()
 
-        for action in self.actions:
-            action.setup()
+        args = argparse.Namespace()
+        [setattr(args, k, v) for k,v in self.args.__dict__.iteritems() if k not in self._argnames]
+        for i,action in enumerate(self.actions):
+            action.setup(args)
 
     def setup_universe(self):
         if self.args.file is None or self.args.struct is None :
