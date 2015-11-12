@@ -40,14 +40,12 @@ if __name__ == '__main__' :
     if find_group and group_first == pdbfile.residues[i].serial :
       atoms = []
       while i < len(pdbfile.residues) and pdbfile.residues[i].serial <= group_last :
-        print pdbfile.residues[i].serial,pdbfile.residues[i].resname
         atoms.extend(pdbfile.residues[i].atoms)
         i=i+1
-      print len(atoms),atoms[0].serial,atoms[-1].serial
-      pbc.make_whole(atoms,pdbfile.box,atom0idx=np.random.randint(0,len(atoms)),verbose=True)
+      pbc.make_whole(atoms,pdbfile.box)
     else :
       if  len(pdbfile.residues[i].atoms) > 1 :
-        pbc.make_whole(pdbfile.residues[i].atoms,pdbfile.box,2)
+        pbc.make_whole(pdbfile.residues[i].atoms,pdbfile.box)
       group2.append(pdbfile.residues[i])
       i = i + 1
 

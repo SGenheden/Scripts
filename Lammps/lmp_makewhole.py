@@ -44,14 +44,14 @@ if __name__ == '__main__' :
 
   for mol in mols :
     # Assume this is water, have to make this better in the future
-    if len(mols[mol]) < 2 or len(mols[mol]) > 200 : continue 
-    pbc.make_whole(mols[mol],box,2) 
+    if len(mols[mol]) < 2 or len(mols[mol]) > 200 : continue
+    pbc.make_whole(mols[mol],box) 
 
   # Adjust box
   xyz = np.array([a.xyz for a in data.atoms])
   data.box[:3] = xyz.min(axis=0)
   data.box[3:] = xyz.max(axis=0)
-    
+
   if args.out is None :
     args.out = args.file+"_whole"
   data.write(args.out)

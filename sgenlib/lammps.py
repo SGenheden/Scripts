@@ -14,7 +14,7 @@ import sys
 import os
 import copy
 from operator import attrgetter
-from ConfigParser import SafeConfigParser 
+from ConfigParser import SafeConfigParser
 
 import numpy as np
 
@@ -58,7 +58,7 @@ def comp_pair(p1,p2) :
   Compare pair parameters, and determine which
   has precedence in a sorted list
   """
-  def comp_atoms(p1,p2) :    
+  def comp_atoms(p1,p2) :
     if p1.iatom < p2.iatom :
       return -1
     elif p1.iatom > p2.iatom :
@@ -67,9 +67,9 @@ def comp_pair(p1,p2) :
       if p1.jatom < p2.jatom :
         return -1
       elif p1.jatom > p2.jatom :
-        return 1      
+        return 1
       else :
-        return 0  
+        return 0
   elba_func = "lj/sf/dipole/sf"
   if p1.func == elba_func  and p2.func != elba_func :
     return -1
@@ -89,7 +89,7 @@ def comp_pair(p1,p2) :
 class Atom :
   """
   Class to store a datafile Atom record
- 
+
   Attributes
   ----------
   idx : integer
@@ -131,28 +131,28 @@ class Atom :
   iy : integer
     the z-component of the periodic box specification
   """
-  def __init__(self,record=None) :    
-    self.idx = 0 
-    self.atype = 0 
-    self.x = 0.0 
+  def __init__(self,record=None) :
+    self.idx = 0
+    self.atype = 0
+    self.x = 0.0
     self.y = 0.0
     self.z = 0.0
-    self.q = 0.0 
-    self.molecule = 0 
+    self.q = 0.0
+    self.molecule = 0
     self.diameter = None
-    self.density = None 
-    self.mux = 0.0 
+    self.density = None
+    self.mux = 0.0
     self.muy = 0.0
     self.muz = 0.0
     self.xyz = None
-    self.mu = None 
-    self.kind = "aa" 
+    self.mu = None
+    self.kind = "aa"
     self.comment = ""
     self.ix = None
     self.iy = None
     self.iz = None
     if record != None : self.read(record)
-  def read(self,record) : 
+  def read(self,record) :
     """
     Read a line from a Datafile
     """
@@ -164,11 +164,11 @@ class Atom :
     try :
       test = int(cols[-1])
       nints = nints + 1
-      test = int(cols[-2]) 
+      test = int(cols[-2])
       nints = nints + 1
       test = int(cols[-3])
       nints = nints + 1
-    except : 
+    except :
       pass
     if nints == 3 : # If ends if ix,iy,iz
        self.iz = int(cols[-1])
@@ -206,11 +206,11 @@ class Atom :
         self.molecule = int(cols[11])
         self.diameter = float(cols[5])
         self.density = float(cols[6])
-        self.set_mu([float(cols[8]),float(cols[9]),float(cols[10])])      
+        self.set_mu([float(cols[8]),float(cols[9]),float(cols[10])])
     else :
       raise Exception("Unknown atom line!")
     self.idx = int(cols[0])
-  def __str__(self) :   
+  def __str__(self) :
     istr = ""
     if self.ix != None :
       istr = " %4d %4d %4d"%(self.ix,self.iy,self.iz)
@@ -240,10 +240,10 @@ class Atom :
     else :
       self.mux = self.muy = self.muz = self.mu = None
 
-class Connectivity : 
+class Connectivity :
   """
   Class to store a bond, angle or torsion
-  
+
   Attributes
   ----------
   idx : int
@@ -279,10 +279,10 @@ class Connectivity :
     self.idx = int(cols[0])
     self.param = int(cols[1])
     self.atoms = [int(i) for i in cols[2:]]
-    
+
   def __str__(self) :
     return "%6d %2d %s %s"%(self.idx,self.param," ".join(["%6d"%i for i in self.atoms]),self.comment)
-  def __cmp__(self,other) :  
+  def __cmp__(self,other) :
     for a1,a2 in zip(self.atoms,other.atoms) :
       if a1 < a2 :
         return -1
@@ -291,14 +291,14 @@ class Connectivity :
     return 0
   def __getitem__(self,idx) :
     if idx == 0 :
-      return self.param 
+      return self.param
     else :
       return self.atoms[idx-1]
-  
+
 class AtomType :
-  """ 
+  """
   Class to store an atom type
-  
+
   Attributes
   ----------
   idx : int
@@ -315,10 +315,10 @@ class AtomType :
     an LJ parameter
   """
   def __init__(self) :
-    self.idx = -1 
-    self.mass = 0.0 
-    self.func = "" 
-    self.comment = "" 
+    self.idx = -1
+    self.mass = 0.0
+    self.func = ""
+    self.comment = ""
     self.epsilon = None
     self.sigma = None
   def read_mass(self,record) :
@@ -329,11 +329,11 @@ class AtomType :
     off = 0
     if cols[0] == "mass" :
       off = 1
-    idx = int(cols[0+off])    
+    idx = int(cols[0+off])
     if self.idx == -1 or idx == self.idx :
       self.idx = idx
-      self.mass = mass = float(cols[1+off]) 
-      if len(cols) > (2+off) : 
+      self.mass = mass = float(cols[1+off])
+      if len(cols) > (2+off) :
         self.comment = " ".join(cols[(2+off):])
     else :
       print "Warning: Trying to set mass of an illegal atom type!"
@@ -342,15 +342,15 @@ class AtomType :
     Read LJ coefficients from a Datafile
     """
     cols = record.strip().split()
-    idx = int(cols[0])    
+    idx = int(cols[0])
     if self.idx == -1 or idx == self.idx :
       self.idx = idx
       self.epsilon = float(cols[1])
       self.sigma = float(cols[2])
-      if len(cols) > 2 : 
+      if len(cols) > 2 :
         self.comment = " ".join(cols[3:])
     else :
-      print "Warning: Trying to set mass of an illegal atom type!"      
+      print "Warning: Trying to set mass of an illegal atom type!"
 
 class PairParam :
   """
@@ -359,9 +359,9 @@ class PairParam :
   Attributes
   ----------
   iatom : int
-    atom type index 
+    atom type index
   jatom : int
-    atom type index 
+    atom type index
   hybrid : int
     hybrid flag
   func : string
@@ -380,22 +380,23 @@ class PairParam :
     a comment to append
   """
   def __init__(self,record=None) :
-    self.iatom = 0 
+    self.iatom = 0
     self.jatom = 0
-    self.hybrid = -1 
-    self.func = "" 
+    self.hybrid = -1
+    self.func = ""
     self.sigma = 0.0
     self.epsilon = 0.0
     self.sigma14 = 0.0
     self.epsilon14 = 0.0
     self.scale = None
     self.comment = "" # Comment
+    self.ljres = 5
     if record != None  : self.read(record)
   def read(self,record) :
     """
     Read pair parameters from an Includefile or Datafile
     """
-    cols = record.strip().split() 
+    cols = record.strip().split()
     if cols[0] != "pair_coeff" : cols.insert(0,"pair_coeff") # Needed for datafile
 
     self.iatom = int(cols[1])
@@ -426,7 +427,7 @@ class PairParam :
     except :
       pass
     if 4+off+1 < len(cols) :
-      self.comment = " ".join(cols[4+off+1:])    
+      self.comment = " ".join(cols[4+off+1:])
   def __str__(self) :
     str14 = ""
     if self.func == "lj/sf/dipole/sf" and self.scale is not None:
@@ -434,16 +435,20 @@ class PairParam :
     else :
       if self.sigma14 != 0.0 :
         str14 = " %15.10f %15.10f"%(self.epsilon14,self.sigma14)
-    
+
+    ljfrmstr = "%"+"15.%df"%self.ljres
+    ljfrmstr = ljfrmstr + " " + ljfrmstr
+    ljstr = ljfrmstr%(self.epsilon,self.sigma)
+
     if self.hybrid > -1 :
-      return "%2d %2d %-20s %2d %15.3f %15.3f%s %s"%(self.iatom,self.jatom,self.func,self.hybrid,self.epsilon,self.sigma,str14,self.comment)
+      return "%2d %2d %-20s %2d %s%s %s"%(self.iatom,self.jatom,self.func,self.hybrid,ljstr,str14,self.comment)
     else :
-      return "%2d %2d %-20s %2s %15.3f %15.3f%s %s"%(self.iatom,self.jatom,self.func,"",self.epsilon,self.sigma,str14,self.comment)
+      return "%2d %2d %-20s %2s %s%s %s"%(self.iatom,self.jatom,self.func,"",ljstr,str14,self.comment)
 
 class ConnectivityParam :
   """
   Class to store a connectivity parameter
- 
+
   Attributes
   ----------
   idx : int
@@ -455,13 +460,13 @@ class ConnectivityParam :
   params : list of string
     the parameters
   """
-  def __init__(self,record) :
-    self.idx = -1 
+  def __init__(self,record=None) :
+    self.idx = -1
     self.func = ""
     self.comment = ""
-    self.params = [] 
+    self.params = []
     if record != None  : self.read(record)
-  def read(self,record) : 
+  def read(self,record) :
     """
     Read a line from either a Datafile or an Includefile
     """
@@ -485,7 +490,7 @@ class ConnectivityParam :
       nparam = nparam + 1
     self.params = [self.__parse_param(c) for c in cols[1+off:1+nparam+off]]
     if nparam+off+1 < len(cols) :
-      self.comment = " ".join(cols[1+nparam+off:])    
+      self.comment = " ".join(cols[1+nparam+off:])
   def __parse_param(self,param) :
     """
     Parse a parameter to an integer or float and convert it to a formated string
@@ -494,7 +499,7 @@ class ConnectivityParam :
       test = int(param)
       return "%8d"%test
     except :
-      test = float(param) 
+      test = float(param)
       return "%8.4f"%test
   def __str__(self) :
     return "%2d %s %s %s"%(self.idx,self.func," ".join(self.params),self.comment)
@@ -534,27 +539,27 @@ class Datafile :
   """
   # Constructor
   def __init__(self,filename=None) :
-    self.atoms = [] 
-    self.bonds = [] 
+    self.atoms = []
+    self.bonds = []
     self.angles = []
-    self.dihedrals = [] 
-    self.impropers = [] 
+    self.dihedrals = []
+    self.impropers = []
     self.atomtypes = []
-    self.pairtypes = [] 
-    self.bondtypes = [] 
-    self.angletypes = [] 
+    self.pairtypes = []
+    self.bondtypes = []
+    self.angletypes = []
     self.dihedraltypes = []
     self.impropertypes = []
-    self.box = np.zeros(6) 
-    self.title = "" 
-    if filename != None : self.read(filename) 
+    self.box = np.zeros(6)
+    self.title = ""
+    if filename != None : self.read(filename)
   def extend(self,copy) :
     """
     Extend atoms and connectivity from another Datafile
     """
     self.title = self.title + "//" + copy.title
     # Extend atoms
-    nmol = 0 
+    nmol = 0
     natoms = len(self.atoms)
     natomtypes = len(self.atomtypes)
     self.atomtypes.extend([None]*len(copy.atomtypes))
@@ -604,11 +609,11 @@ class Datafile :
         elif line.find(" angles") > -1 : self.angles = [None]*int(line.strip().split()[0])
         elif line.find(" dihedrals") > -1 : self.dihedrals = [None]*int(line.strip().split()[0])
         elif line.find(" impropers") > -1 : self.impropers = [None]*int(line.strip().split()[0])
-  
+
         elif line.find(" atom types") > -1 : self.atomtypes = [None]*int(line.strip().split()[0])
         elif line.find(" bond types") > -1 : self.bondtypes = [None]*int(line.strip().split()[0])
         elif line.find(" angle types") > -1 : self.angletypes = [None]*int(line.strip().split()[0])
-        elif line.find(" dihedral types") > -1 : self.dihedraltypes = [None]*int(line.strip().split()[0]) 
+        elif line.find(" dihedral types") > -1 : self.dihedraltypes = [None]*int(line.strip().split()[0])
 
         # Read the box
         elif line.find("xlo") > -1 :
@@ -631,13 +636,13 @@ class Datafile :
             if self.atomtypes[i] == None :
               self.atomtypes[i] = AtomType()
             self.atomtypes[i].read_mass(f.readline())
- 
+
         elif line.find("Pair Coeffs") > -1 :
           line = f.readline() # Dummy line
           for i in range(len(self.atomtypes)) :
             if self.atomtypes[i] == None :
               self.atomtypes[i] = AtomType()
-            self.atomtypes[i].read_lj(f.readline())        
+            self.atomtypes[i].read_lj(f.readline())
 
         elif line.find("PairIJ Coeffs") > -1 :
           line = f.readline() # Dummy line
@@ -684,15 +689,15 @@ class Datafile :
           for i in range(len(self.dihedrals)) :
             self.dihedrals[i] = Connectivity(record=f.readline())
 
-        line = f.readline()    
-  
+        line = f.readline()
+
   def single_lj(self) :
     """
     Return a list of AtomType objects for eahc unique atom type among the PairParam objects
     """
-    if len(self.pairtypes) == 0 : 
+    if len(self.pairtypes) == 0 :
       return self.atomtypes
-    
+
     paramlist = []
     for p in self.pairtypes :
       if p.iatom != p.jatom : continue
@@ -707,7 +712,7 @@ class Datafile :
           paramlist[-1].mass = t.mass
           break
     return paramlist
-    
+
   def sort(self,reorder=True) :
     """
     Sort Atoms, Bonds, Angles and Dihedrals
@@ -718,7 +723,7 @@ class Datafile :
       if true, sorts connectivity based on atom indices
     """
     self.atoms.sort(key=attrgetter("idx"))
-    
+
     for list in [self.bonds,self.angles,self.dihedrals] :
       if reorder :
         list.sort()
@@ -795,7 +800,7 @@ class Datafile :
       for imp in self.impropers :
         f.write("%s\n"%imp.__str__())
       f.write("\n")
-    
+
 class Includefile() :
   """
   Class to store a LAMMPS Includefile
@@ -813,16 +818,16 @@ class Includefile() :
   dihedralparams : list of ConnectivityParam objects
     the dihedral parameters
   improperparams : list of ConnectivityParam objects
-    the improper parameters  
+    the improper parameters
   """
   def __init__(self,filename=None) :
-    self.masses = [] 
+    self.masses = []
     self.pair_coeff = []
     self.bondparams = []
     self.angleparams = []
-    self.dihedralparams = [] 
+    self.dihedralparams = []
     self.improperparams = []
-    if filename != None : self.read(filename) 
+    if filename != None : self.read(filename)
   def duplicate_type(self,atype) :
     """
     Duplicate a type, creating new mass and pair_coeff entries
@@ -831,7 +836,7 @@ class Includefile() :
     newmass.idx = len(self.masses)+1
     new_paircoeff = []
     for paircoeff in self.pair_coeff :
-      if atype in [paircoeff.iatom , paircoeff.jatom] :    
+      if atype in [paircoeff.iatom , paircoeff.jatom] :
         newpair = copy.deepcopy(paircoeff)
         if newpair.comment == "" : newpair.comment = "#"
         newpair.comment = newpair.comment + " copy of %d,%d"%(newpair.iatom,newpair.jatom)
@@ -845,7 +850,7 @@ class Includefile() :
           newpair.iatom = temp
         new_paircoeff.append(newpair)
         if paircoeff.iatom == paircoeff.jatom :
-          newpair = copy.deepcopy(paircoeff) 
+          newpair = copy.deepcopy(paircoeff)
           newpair.comment += " copy of %d,%d"%(newpair.iatom,newpair.jatom)
           newpair.jatom = len(self.masses)+1
           new_paircoeff.append(newpair)
@@ -855,26 +860,26 @@ class Includefile() :
     Extend with another Include file
 
     Mixes LJ parameters with Lorentz-Berthelot rules
- 
+
     Parameters
     ----------
     copy : Includefile object
       the include file to append to this
     lj_hybrid : int
       the hybrid flag for the pair coefficient
-    lj_func : string 
+    lj_func : string
       the function for the pair coefficient
     ang_func : string, optional
-      the function for the angle parameters   
+      the function for the angle parameters
     dih_func : string, optional
-      the function for the dihedral parameters   
+      the function for the dihedral parameters
     """
     natomtypes = 0
     for m in self.masses : natomtypes = max(natomtypes,m.idx)
     # Add new masses and offset the idx
     for m in copy.masses :
       self.masses.append(m)
-      self.masses[-1].idx = natomtypes + self.masses[-1].idx 
+      self.masses[-1].idx = natomtypes + self.masses[-1].idx
     # Add new pair coefficients
     my_lj = self.__lj_same()
     copy_lj = copy.__lj_same()
@@ -903,7 +908,7 @@ class Includefile() :
     Extend with another Datafile
 
     Mixes LJ parameters with Lorentz-Berthelot rules
- 
+
     Parameters
     ----------
     copy : Includefile object
@@ -917,9 +922,9 @@ class Includefile() :
     lj_func : dictionary, optional
       the function for the pair coefficients when mixing them
     ang_func : string, optional
-      the function for the angle parameters 
+      the function for the angle parameters
     dih_func : string, optional
-      the function for the dihedral parameters      
+      the function for the dihedral parameters
     """
     natomtypes = 0
     for m in self.masses : natomtypes = max(natomtypes,m.idx)
@@ -927,7 +932,7 @@ class Includefile() :
     # Add new masses and offset the idx
     for m in copy_atomtypes :
       self.masses.append(m)
-      self.masses[-1].idx = natomtypes + self.masses[-1].idx   
+      self.masses[-1].idx = natomtypes + self.masses[-1].idx
     # Add new pair coefficients
     my_lj = self.__lj_same()
     for i_lj in my_lj :
@@ -945,7 +950,7 @@ class Includefile() :
           self.pair_coeff[-1].func = lj_func_mix[i_lj.func]
         self.pair_coeff[-1].comment = "# Mixed using Lorentz-Berthelot rules"
         self.pair_coeff[-1].epsilon = np.sqrt(i_lj.epsilon*j_lj.epsilon)
-        self.pair_coeff[-1].sigma = (i_lj.sigma+j_lj.sigma)/2.0     
+        self.pair_coeff[-1].sigma = (i_lj.sigma+j_lj.sigma)/2.0
     if not copy.pairtypes :
       for i_lj in copy.atomtypes :
         for j_lj in copy.atomtypes :
@@ -977,12 +982,12 @@ class Includefile() :
         if lj_func == None :
           self.pair_coeff[-1].func = ""
         else :
-          self.pair_coeff[-1].func = lj_func       
+          self.pair_coeff[-1].func = lj_func
     # Add new connectivity params
     self.__extend_con(self.bondparams,copy.bondtypes)
     self.__extend_con(self.angleparams,copy.angletypes,func=ang_func)
-    self.__extend_con(self.dihedralparams,copy.dihedraltypes,func=dih_func)  
-    self.__extend_con(self.improperparams,copy.impropertypes)         
+    self.__extend_con(self.dihedralparams,copy.dihedraltypes,func=dih_func)
+    self.__extend_con(self.improperparams,copy.impropertypes)
   def read(self,filename) :
     """
     Read from disc
@@ -990,7 +995,7 @@ class Includefile() :
     with open(filename,"r") as f :
       line = f.readline()
       while line :
-        if line.find("mass") == 0 : 
+        if line.find("mass") == 0 :
           self.masses.append(AtomType())
           self.masses[-1].read_mass(line)
         elif line.find("pair_coeff") == 0 : self.pair_coeff.append(PairParam(record=line))
@@ -998,8 +1003,8 @@ class Includefile() :
         elif line.find("angle_coeff") == 0 : self.angleparams.append(ConnectivityParam(record=line))
         elif line.find("dihedral_coeff") == 0 : self.dihedralparams.append(ConnectivityParam(record=line))
         elif line.find("improper_coeff") == 0 : self.improperparams.append(ConnectivityParam(record=line))
-        line = f.readline()      
-  def write(self,filename) :
+        line = f.readline()
+  def write(self,filename,ljres=5) :
     """
     Write to disc
     """
@@ -1009,7 +1014,9 @@ class Includefile() :
     for m in self.masses : f.write("mass %2d %10.5f %s\n"%(m.idx,m.mass,m.comment))
     f.write("\n# Lennard-Jones coefficients\n")
     f.write("#          %2s %2s %-20s %2s %15s %15s\n"%("i","j","(style)","(hy)","epsilon","sigma"))
-    for pair in self.pair_coeff : f.write("pair_coeff %s\n"%pair.__str__())
+    for pair in self.pair_coeff :
+        pair.ljres = ljres
+        f.write("pair_coeff %s\n"%pair.__str__())
     f.write("\n# Bond coefficients\n")
     f.write("#           type params\n")
     for bnd in self.bondparams : f.write("bond_coeff %s\n"%bnd.__str__())
@@ -1072,8 +1079,8 @@ class DumpFile :
     """
     Read a specific snapshot from disc
     """
-    if snapshot == None or snapshot < 0 : 
-      f = open(filename,"r") 
+    if snapshot == None or snapshot < 0 :
+      f = open(filename,"r")
       line = f.readline()
       while line :
         if line.find("ITEM: TIMESTEP") == 0 :
@@ -1090,13 +1097,13 @@ class DumpFile :
         n = n + 1
         # Read timestep
         idx = int(f.readline().strip())
-        if n % 1000 == 0 : 
-          print idx, 
+        if n % 1000 == 0 :
+          print idx,
           sys.stdout.flush()
         if idx == snapshot :
           box = np.zeros(6)
           atoms = []
-          keys = []      
+          keys = []
           # Read number of atoms
           f.readline()
           natom = int(f.readline().strip())
@@ -1180,7 +1187,7 @@ class ResidueConverter :
   def generate_cg(self,residue,molidx,data,mapping=True) :
     """
     Generate a CG molecule
- 
+
     Parameters
     ----------
     residue : Residue object
@@ -1206,13 +1213,13 @@ class ResidueConverter :
       x=r*np.cos(theta)*np.cos(phi)
       y=r*np.cos(theta)*np.sin(phi)
       return np.array([x,y,z])
-      
+
     # Find and build up the coordinates for each CG bead
     if mapping :
       coords = [np.zeros(3) for name in self.cg_names]
       counts = {name : 0 for name in self.cg_names}
       for atom in residue.atoms :
-        name = atom.name.strip().lower()     
+        name = atom.name.strip().lower()
         for i,cg_name in enumerate(self.cg_names) :
           if name in self.aa_names[cg_name] :
             coords[i] = coords[i] + atom.xyz
@@ -1224,54 +1231,54 @@ class ResidueConverter :
 
     else :
       coords = [np.zeros(3) for name in self.cg_names]
-      counts = {name : 1 for name in self.cg_names}   
+      counts = {name : 1 for name in self.cg_names}
       for i,ratom in enumerate(residue.atoms) :
         coords[i] = np.array(ratom.xyz,copy=True)
 
     # Create the Atom objects
-    n = len(data.atoms) 
+    n = len(data.atoms)
     for i,name in enumerate(self.cg_names) :
       coords[i] = coords[i] / counts[name]
-      atom = Atom(record=self.creates[name]%(len(data.atoms)+1,coords[i][0],coords[i][1],coords[i][2],molidx)) 
+      atom = Atom(record=self.creates[name]%(len(data.atoms)+1,coords[i][0],coords[i][1],coords[i][2],molidx))
       r = np.sqrt(np.sum(atom.mu**2))
       if r > 0 :
         vec = sphere_rand(r)
-        rnew = np.sqrt(np.sum(vec**2)) 
+        rnew = np.sqrt(np.sum(vec**2))
         if abs(rnew - r) > 0.001 : print "Failed: %.3f %.3f %.3E"%(r,rnew,rnew-r)
         atom.set_mu(vec)
       data.atoms.append(atom)
 
     # Create the connectivity
-    for bond in self.bonds :      
+    for bond in self.bonds :
       b = Connectivity(record="%d %d %d %d"%(len(data.bonds)+1,bond[0],bond[1]+n,bond[2]+n))
       data.bonds.append(b)
 
-    for angle in self.angles :      
+    for angle in self.angles :
       a = Connectivity(record="%d %d %d %d %d"%(len(data.angles)+1,angle[0],angle[1]+n,angle[2]+n,angle[3]+n))
       data.angles.append(a)
 
-    for dihedral in self.dihedrals :      
+    for dihedral in self.dihedrals :
       a = Connectivity(record="%d %d %d %d %d %d"%(len(data.dihedrals)+1,dihedral[0],dihedral[1]+n,dihedral[2]+n,dihedral[3]+n,dihedral[4]+n))
       data.dihedrals.append(a)
 
-    return coords      
+    return coords
   def parse(self,section,parser) :
     """
     Parse a ConfigParser section to read in the conversion specification
     """
     self.cg_names = parser.get(section,"names").split()
     for name in self.cg_names :
-      self.aa_names[name] = parser.get(section,"%s_names"%name).split()      
+      self.aa_names[name] = parser.get(section,"%s_names"%name).split()
       self.creates[name] = parser.get(section,"%s_create"%name)
     if "bonds" in parser.options(section) :
       for bond in parser.get(section,"bonds").split() :
         self.bonds.append(map(int,bond.split(",")))
     if "angles" in parser.options(section) :
       for angle in parser.get(section,"angles").split() :
-        self.angles.append(map(int,angle.split(",")))  
+        self.angles.append(map(int,angle.split(",")))
     if "dihedrals" in parser.options(section) :
       for dihedral in parser.get(section,"dihedrals").split() :
-        self.dihedrals.append(map(int,dihedral.split(",")))  
+        self.dihedrals.append(map(int,dihedral.split(",")))
     self.name = section
   def __str__(self) :
     return " ".join(self.cg_names)
@@ -1279,7 +1286,7 @@ class ResidueConverter :
 class Aa2Cg :
   """
   Class to store and read a dictionary of conversion specifications
- 
+
   Attributes
   ----------
   residues : list of ResidueConverter objects
@@ -1295,7 +1302,7 @@ class Aa2Cg :
 
     parser = SafeConfigParser()
     parser.read(filename)
-    
+
     # Then parse it into ResidueConvert objects
     for section in parser.sections() :
       self.residues.append(ResidueConverter())
@@ -1379,7 +1386,7 @@ def combine_datafiles(data1,data2,box) :
       data["density"].extend([1.0]*data2["atoms"])
 
   if data["bonds"] > 0 :
-    data["bonddata"] = np.zeros([data["bonds"],3],dtype=int) 
+    data["bonddata"] = np.zeros([data["bonds"],3],dtype=int)
     merge_topol("bond")
 
   if data["angles"] > 0 :
@@ -1447,7 +1454,7 @@ def combine_forcefields(forcefield1,forcefield2) :
         forcefield["paircoeff"][i,j,0] = eps
         forcefield["paircoeff"][i,j,1] = sig
   if "pair_an" in forcefield1 :
-    for i,a in enumerate(forcefield1["pair_an"]) : 
+    for i,a in enumerate(forcefield1["pair_an"]) :
       if len(a) > 2 :
         forcefield["pair_an"].append(a)
       else :
@@ -1463,7 +1470,7 @@ def combine_forcefields(forcefield1,forcefield2) :
       forcefield["pair_an"].append("Mixed")
 
   if "paircoeff" in forcefield2 :
-    forcefield["paircoeff"][forcefield1["atomtypes"]:,forcefield1["atomtypes"]:,:] = forcefield2["paircoeff"]  
+    forcefield["paircoeff"][forcefield1["atomtypes"]:,forcefield1["atomtypes"]:,:] = forcefield2["paircoeff"]
   elif "ljcoeff" in forcefield2 :
     for i in range(forcefield2["atomtypes"]) :
       for j in range(i,forcefield2["atomtypes"]) :
@@ -1472,7 +1479,7 @@ def combine_forcefields(forcefield1,forcefield2) :
         forcefield["paircoeff"][forcefield1["atomtypes"]+i,forcefield1["atomtypes"]+j,0] = eps
         forcefield["paircoeff"][forcefield1["atomtypes"]+i,forcefield1["atomtypes"]+j,1] = sig
   if "pair_an" in forcefield2 :
-    for i,a in enumerate(forcefield2["pair_an"]) : 
+    for i,a in enumerate(forcefield2["pair_an"]) :
       if len(a) > 2 :
         forcefield["pair_an"].append(a)
       else :
@@ -1515,8 +1522,8 @@ def read_datafile(filename,data,forcefield,atomtype) :
   i = 0
   while lines[i].find("zlo") == -1 and i < len(lines)-1:
 
-    i = i + 1    
- 
+    i = i + 1
+
     if lines[i].find(" atoms") > -1 :
       data["atoms"] = int(lines[i].strip().split()[0])
     if lines[i].find(" bonds") > -1 :
@@ -1572,7 +1579,7 @@ def read_datafile(filename,data,forcefield,atomtype) :
   if data["impropers"] > 0 :
     data["improperdata"] = np.zeros([data["impropers"],5],dtype=int)
   if data["atomtypes"] > 0 :
-    forcefield["masses"] = [0]*data["atomtypes"]  
+    forcefield["masses"] = [0]*data["atomtypes"]
     forcefield["ljcoeff"] = [0]*data["atomtypes"]
   if data["bondtypes"] > 0 :
     forcefield["bondcoeff"] = [0]*data["bondtypes"]
@@ -1582,7 +1589,7 @@ def read_datafile(filename,data,forcefield,atomtype) :
     forcefield["dihedralcoeff"] = [0]*data["dihedraltypes"]
 
   while i < len(lines) :
-  
+
     if i < len(lines) and lines[i].find("Masses") > - 1 :
       i = i + 2
       for j in range(data["atomtypes"]) :
@@ -1618,7 +1625,7 @@ def read_datafile(filename,data,forcefield,atomtype) :
       for j in range(data["bonds"]) :
         data["bonddata"][j,:] = np.array(lines[i].strip().split()[1:],dtype=int)
         i = i + 1
-    
+
     if i < len(lines) and lines[i].find("Angles") > - 1 :
       i = i + 2
       for j in range(data["angles"]) :
@@ -1629,7 +1636,7 @@ def read_datafile(filename,data,forcefield,atomtype) :
       i = i + 2
       for j in range(data["dihedrals"]) :
         data["dihedraldata"][j,:] = np.array(lines[i].strip().split()[1:],dtype=int)
-        i = i + 1       
+        i = i + 1
 
     if i < len(lines) and lines[i].find("Atoms") > - 1 :
       i = i + 2
@@ -1655,9 +1662,9 @@ def read_datafile(filename,data,forcefield,atomtype) :
           data["diameter"][j] = float(cols[5])
           data["density"][j] = float(cols[6])
           data["molecule"][j] = int(cols[11])
-        i = i + 1       
-    
-    i = i + 1  
+        i = i + 1
+
+    i = i + 1
 
 def read_forcefield(filename,forcefield) :
 
@@ -1672,8 +1679,8 @@ def read_forcefield(filename,forcefield) :
   while i < len(lines) :
     if lines[i].find("mass") == 0 : forcefield["atomtypes"] = forcefield["atomtypes"] + 1
     if lines[i].find("bond_coeff") == 0 : forcefield["bondtypes"] = forcefield["bondtypes"] + 1
-    if lines[i].find("angle_coeff") == 0 : forcefield["angletypes"] = forcefield["angletypes"] + 1 
-    if lines[i].find("dihedral_coeff") == 0 : forcefield["dihedraltypes"] = forcefield["dihedraltypes"] + 1 
+    if lines[i].find("angle_coeff") == 0 : forcefield["angletypes"] = forcefield["angletypes"] + 1
+    if lines[i].find("dihedral_coeff") == 0 : forcefield["dihedraltypes"] = forcefield["dihedraltypes"] + 1
     i = i + 1
 
   forcefield["masses"] = np.zeros(forcefield["atomtypes"])
@@ -1681,18 +1688,18 @@ def read_forcefield(filename,forcefield) :
   forcefield["paircoeff"] = np.zeros([forcefield["atomtypes"],forcefield["atomtypes"],2])
   forcefield["pair_style"] = []
   forcefield["pair_an"] = []
-  forcefield["bondcoeff"] = np.zeros([forcefield["bondtypes"],2])    
+  forcefield["bondcoeff"] = np.zeros([forcefield["bondtypes"],2])
   forcefield["bond_an"] = []
-  forcefield["anglecoeff"] = np.zeros([forcefield["angletypes"],2])    
+  forcefield["anglecoeff"] = np.zeros([forcefield["angletypes"],2])
   if forcefield["angletypes"] > 0 :
     forcefield["angle_an"] = []
     forcefield["anglepot"] = []
-  forcefield["dihedralcoeff"] = np.zeros([forcefield["dihedraltypes"],3])    
+  forcefield["dihedralcoeff"] = np.zeros([forcefield["dihedraltypes"],3])
   forcefield["dihedral_an"] = []
-  
+
   i=0
-  while i < len(lines) : 
-        
+  while i < len(lines) :
+
     if i < len(lines) and lines[i].find("mass") == 0 :
       for j in range(forcefield["atomtypes"]) :
         cols = lines[i].strip().split()
@@ -1700,7 +1707,7 @@ def read_forcefield(filename,forcefield) :
         if len(cols) >= 5 :
           forcefield["mass_an"].append(cols[4])
         i = i + 1
-  
+
     if i < len(lines) and lines[i].find("pair_coeff") == 0 :
       cols = lines[i].strip().split()
       ai = int(cols[1])-1
@@ -1708,17 +1715,17 @@ def read_forcefield(filename,forcefield) :
       try :
         test = float(cols[3])
         forcefield["paircoeff"][ai,aj,:] = np.array(cols[3:5],dtype=float)
-        if len(cols) >= 7 :    
+        if len(cols) >= 7 :
           forcefield["pair_an"].append(cols[6])
         else :
           forcefield["pair_an"].append("")
-        try : 
+        try :
           del forcefield["pair_style"]
         except :
           pass
       except :
         forcefield["paircoeff"][ai,aj,:] = np.array(cols[4:6],dtype=float)
-        if len(cols) >= 8 :    
+        if len(cols) >= 8 :
           forcefield["pair_an"].append(cols[7])
         else :
           forcefield["pair_an"].append("")
@@ -1751,7 +1758,7 @@ def read_forcefield(filename,forcefield) :
           forcefield["angle_an"].append(cols[6])
         else :
           forcefield["angle_an"].append("")
-    
+
     i = i + 1
 
 
@@ -1775,7 +1782,7 @@ def write_datafile(filename,data) :
     f.write("%9d angle types\n"%(data["angletypes"]))
   if "dihedraltypes" in data :
     f.write("%9d dihedral types\n"%(data["dihedraltypes"]))
- 
+
   f.write("\n%13.5f%13.5f    xlo xhi\n"%(data["boxx"][0],data["boxx"][1]))
   f.write("%13.5f%13.5f    ylo yhi\n"%(data["boxy"][0],data["boxy"][1]))
   f.write("%13.5f%13.5f    zlo zhi\n"%(data["boxz"][0],data["boxz"][1]))
@@ -1789,17 +1796,17 @@ def write_datafile(filename,data) :
 
   if "bonds" in data :
     f.write("\nBonds\n\n")
-    for i in range(data["bonds"]) :  
+    for i in range(data["bonds"]) :
       f.write("%7d%5d%7d%7d\n"%(i+1,data["bonddata"][i,0],data["bonddata"][i,1],data["bonddata"][i,2]))
 
   if "angles" in data :
     f.write("\nAngles\n\n")
-    for i in range(data["angles"]) :  
+    for i in range(data["angles"]) :
       f.write("%7d%5d%7d%7d%7d\n"%(i+1,data["angledata"][i,0],data["angledata"][i,1],data["angledata"][i,2],data["angledata"][i,3]))
 
   if "dihedrals" in data :
     f.write("\nDihedrals\n\n")
-    for i in range(data["dihedrals"]) :  
+    for i in range(data["dihedrals"]) :
       f.write("%7d%5d%7d%7d%7d%7d\n"%(i+1,data["dihedraldata"][i,0],data["dihedraldata"][i,1],data["dihedraldata"][i,2],data["dihedraldata"][i,3],data["dihedraldata"][i,4]))
 
   f.close()
@@ -1836,7 +1843,7 @@ def write_forcefield(filename,forcefield) :
       k = k + 1
 
   if "bondtypes" in forcefield :
-    f.write("\n# harmonic bond coefficients:\n")  
+    f.write("\n# harmonic bond coefficients:\n")
     f.write("#         bondType   K     r0  \n")
     for i in range(forcefield["bondtypes"]) :
       if "bond_an" in forcefield and forcefield["bond_an"][i] != "" :
@@ -1846,7 +1853,7 @@ def write_forcefield(filename,forcefield) :
 
   if "angletypes" in forcefield :
     f.write("\n")
-    if "anglepot" in forcefield :     
+    if "anglepot" in forcefield :
       anglepot = ""
       for i in range(forcefield["angletypes"]) :
         if anglepot != forcefield["anglepot"][i] :
@@ -1855,14 +1862,14 @@ def write_forcefield(filename,forcefield) :
           if anglepot in ["cosine/squared","harmonic"] :
             f.write("#	  angleType	             K    theta0 \n")
           elif anglepot == "dipole" :
-            f.write("#	  angleType	   K   gamma0  \n")  
+            f.write("#	  angleType	   K   gamma0  \n")
       if "angle_an" in forcefield and forcefield["angle_an"][i] != ""  :
         f.write("angle_coeff%5d %15s %9.3f%9.3f # %s\n"%(i+1,anglepot,forcefield["anglecoeff"][i][0],forcefield["anglecoeff"][i][1],forcefield["angle_an"][i]))
       else :
         f.write("angle_coeff%5d %15s %9.3f%9.3f \n"%(i+1,anglepot,forcefield["anglecoeff"][i][0],forcefield["anglecoeff"][i][1]))
     else :
       f.write("# angle coefficients:\n")
-      f.write("#	  angleType  K    theta0 \n")  
+      f.write("#	  angleType  K    theta0 \n")
       for i in range(forcefield["angletypes"]) :
         if "angle_an" in forcefield and forcefield["angle_an"][i] != ""  :
           f.write("angle_coeff%5d %9.3f%9.3f # %s\n"%(i+1,forcefield["anglecoeff"][i][0],forcefield["anglecoeff"][i][1],forcefield["angle_an"][i]))

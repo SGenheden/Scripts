@@ -31,7 +31,7 @@ def make_whole(atoms,box) :
     # Uwrap each atom, based on the position of the previous atom
     for atomi,atomj in zip(atoms[1:],atoms[:-1]) :
         dr = unwrap_vector(atomj.xyz-atomi.xyz,box)
-        atom.set_xyz(atom.xyz+dr)
+        atomi.set_xyz(atomi.xyz+dr)
 
 def make_whole_xyz(xyz,box,dim=[True,True,True]) :
     """
