@@ -46,6 +46,8 @@ class TrajectoryProcessor(object):
         the subsample frequency
     skip : float
         the number of ps to skip
+    nprocessed : int
+        the number of snapshots that were processed
     subsamples : int
         the number of subsamples
     universe : MDAnalysis.Universe
@@ -59,6 +61,7 @@ class TrajectoryProcessor(object):
         self.argparser.add_argument('-s', '--struct', help="a structure file")
         self.argparser.add_argument('--skip', type=int, help="skip this many snapshots", default=0)
         self.argparser.add_argument('--every',type=int,help="print out every X frame",default=1)
+        self.argparser.add_argument('--stop',type=int,help="stop after this time")
         self.argparser.add_argument('--dt', type=float, help="the number of ps for each snapshot", default=10)
         self._argnames = ["file","struct","skip","every","dt"]
         if dosubsample:
@@ -73,8 +76,9 @@ class TrajectoryProcessor(object):
         self.subsamples = 0
         self.freq = 0
         self.actions = []
+        self.nprocessed = None
 
-    def setup(self,printargs=False,action_arguments=[]):
+    def setup(self,printargs=False):
         """
         Parsing command-line arguments and setting up the MD universe
         This routine should be called before process()
@@ -89,6 +93,7 @@ class TrajectoryProcessor(object):
         self.skip = self.args.skip
         self.dt = self.args.dt
         self.every = self.args.every
+        self.stop = self.args.stop
         if self.dosubsample:
             self.freq = self.args.freq
             self.subsamples = self.freq/self.dt
@@ -111,6 +116,7 @@ class TrajectoryProcessor(object):
         """
         if self.universe is None or not self.actions: return
 
+        self.nprocessed = 0
         for ti, ts in enumerate(self.universe.trajectory,1):
             self.currsnap = ts
             self.currbox = ts.dimensions[:3]
@@ -123,12 +129,15 @@ class TrajectoryProcessor(object):
             if ti % self.every != 0 :
                 continue
             self.call_actions()
+            if self.stop is not None and self.stop == self.currtime :
+                break
 
         print ""
         for action in self.actions :
             action.finalize()
 
     def call_actions(self):
+        self.nprocessed += 1
         for action in self.actions:
             action.process()
             if self.dosubsample and action.dosubsample and \
