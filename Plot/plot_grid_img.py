@@ -43,7 +43,7 @@ if __name__ == '__main__' :
     config = WidthHeight(width=args.config[1],height=args.config[0])
     size = WidthHeight(width=args.size[0],height=args.size[1])
 
-    if config.height*config.width != len(args.file) :
+    if config.height*config.width < len(args.file) :
         print "Configuration is incompatible with the numbers of specified files"
         quit()
 

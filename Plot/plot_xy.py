@@ -11,6 +11,7 @@ import matplotlib.pylab as plt
 
 from sgenlib import colors
 from sgenlib import parsing
+from sgenlib import series
 
 if __name__ == '__main__' :
 
@@ -26,6 +27,8 @@ if __name__ == '__main__' :
   parser.add_argument('--xlabel',help="the x label")
   parser.add_argument('--ylabel',help="the y label")
   parser.add_argument('--xmax',type=float,help="the maximum of the x-axis")
+  parser.add_argument('--ymax',type=float,help="the maximum of the y-axis")
+  parser.add_argument('--equil',action="store_true",help="estimate equilibration",default=False)
   args = parser.parse_args()
 
   f = plt.figure(figsize=(3.33,2.5))
@@ -38,7 +41,12 @@ if __name__ == '__main__' :
     else :
       n = args.skip
     data = data[n:,:]
-    a.plot(data[n:,args.xcol]*args.xfactor,data[n:,args.ycol]*args.yfactor,colors.style(i),color=colors.color(i),label=label)
+    x = data[n:,args.xcol]*args.xfactor
+    y = data[n:,args.ycol]*args.yfactor
+    a.plot(x,y,colors.style(i),color=colors.color(i),label=label)
+    if args.equil :
+        equili = series.find_equilibration(x,y)
+        print "%s equilibrated at %.3f"%(label,x[equili])
 
   if len(args.file) > 1 :
       a.legend(loc='best', fancybox=True, framealpha=0.5,fontsize=8,labelspacing=0.20)
@@ -50,4 +58,5 @@ if __name__ == '__main__' :
   if args.xlabel is not None : a.set_xlabel(args.xlabel,fontsize=8)
   if args.ylabel is not None : a.set_ylabel(args.ylabel,fontsize=8)
   if args.xmax is not None : a.set_xlim([0,args.xmax])
+  if args.ymax is not None : a.set_ylim([0,args.ymax])
   f.savefig(args.out,format="png",dpi=300)

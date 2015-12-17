@@ -8,16 +8,16 @@ import urllib
 
 class RetrieveSmilesException(Exception):
     pass
- 
+
 def _get_cactus(smiles):
     """
     Convert SMILES using Cactus service
-  
+
     Parameters
     ----------
     smiles : string
       the SMILES string
-  
+
     Returns
     -------
     string
@@ -31,9 +31,9 @@ def _get_cactus(smiles):
     site = "cactus.nci.nih.gov"
     try:
         page = urllib.urlopen("http://%s/cgi-bin/translate.tcl?smiles=%s&format=sdf&astyle=kekule&dim=3D&file="%(site, smiles))
-    except: 
+    except:
         raise RetrieveSmilesException("Could not connect with server")
-  
+
     for line in page:
         if "Click here" in line  and 'a href="' in line :
             dummy1, url, dummy2 = line.split('"')
@@ -47,12 +47,12 @@ def _get_cactus(smiles):
 def _get_indiana(smiles) :
     """
     Convert SMILES using Indiana service
-  
+
     Parameters
     ----------
     smiles : string
       the SMILES string
-  
+
     Returns
     -------
     string
@@ -68,12 +68,15 @@ def _get_indiana(smiles) :
     except :
         raise RetrieveSmilesException("Could not connect with server")
     else:
+        with open(path,"r") as f:
+            if f.readline().startswith("<!DOCTYPE HTML"):
+                raise RetrieveSmilesException("Server Error")
         return path
-  
+
 def _sdf2xyz(sdffile,xyzfile) :
     """
     Read a SDF file and convert it to xyz-format
-  
+
     Parameters
     ----------
     sdffile : string
@@ -108,7 +111,7 @@ def convert2xyz(smiles,out,web=None,verbose=True):
       can be either cactus, indiana, both or none
       determines the web service to use
     verbose : boolean, optional
-      if the routine should write out verbose information 
+      if the routine should write out verbose information
     """
 
     # Try to convert the SMILES string using one of two web services
@@ -145,8 +148,8 @@ def convert2xyz(smiles,out,web=None,verbose=True):
                 service = "cactus"
         else:
             service = "indiana"
-            
-            
+
+
     text = {"indiana":"the smi23d web service provided by the Chemical Informatics and Cyberinfrastructure Collaboratory at Indiana University","cactus":" the SMILES translator provided by the National Cancer Institute CADD group"}
     link = {"indiana":"http://www.chembiogrid.info/projects/proj_ws_all.html","cactus":"http://cactus.nci.nih.gov/translate/"}
     _sdf2xyz(path,out)

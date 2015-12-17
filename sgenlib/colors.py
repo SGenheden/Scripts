@@ -12,16 +12,16 @@ def color(idx) :
 
   For instances when the index is larger than the number of defined colors,
   this routine takes care of this by periodicity, i.e.
-  color at idx=0 is the same color as idx=n 
+  color at idx=0 is the same color as idx=n
 
   Parameters
   ----------
   idx : int
     the index of the color
-  
+
   Returns
   -------
-  list of floats 
+  list of floats
     the color
   """
   colors = []
@@ -35,7 +35,13 @@ def color(idx) :
   colors.append((174.0/255.0,207.0/255.0,0.0/255.0))
   d = int(len(colors)*np.floor(idx / float(len(colors))))
   return colors[idx-d]
-  
+
+def darker(color, size=0.90):
+
+    return (size*color[0],
+            size*color[1],
+            size*color[2])
+
 def style(idx) :
 
   styles = "-. : - --".split()
