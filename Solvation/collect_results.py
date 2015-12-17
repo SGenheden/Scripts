@@ -130,6 +130,7 @@ if __name__ == '__main__':
     argparser.add_argument('-simsolvent', '--simsolvent', help="the simulated solvent")
     argparser.add_argument('-solutes','--solutes',help="the list of solutes")
     argparser.add_argument('-outdir','--outdir',help="the directory with output files",default=".")
+    argparser.add_argument('-watdir','--watdir',help="the directory with water output directory",default="..")
     argparser.add_argument('-xls','--xls',help="the filename of the XLS file")
     argparser.add_argument('-sheet','--sheet',help="the sheet in the XLS file")
     args = argparser.parse_args()
@@ -157,7 +158,7 @@ if __name__ == '__main__':
         _fill_solutedata(db,args.solvent,args.simsolvent,solutes,args.outdir,ws,0)
 
     if args.simsolvent != "water":
-        woutdir = os.path.join(args.outdir,'..','Water')
+        woutdir = os.path.join(args.watdir,'Water')
         wdata,wdbentries,wcalcol,wstdcol,wexpcol = \
             _fill_solutedata(db,'water','water',solutes,woutdir,ws,10)
 

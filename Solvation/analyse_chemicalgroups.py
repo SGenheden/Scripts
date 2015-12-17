@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 
 import dblib
-import ambertools
+from sgenlib import ambertools
 
 babel_str = "babel -ipdb %s_leap.pdb -osdf %s_leap.sdf"
 checkmol_str = "checkmol %s"
