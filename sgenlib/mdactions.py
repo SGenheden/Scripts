@@ -9,12 +9,48 @@ from collections import namedtuple
 import MDAnalysis as md
 import MDAnalysis.core.AtomGroup as AtomGroup
 import MDAnalysis.analysis.align as align
+import MDAnalysis.lib.util as mdutil
 import numpy as np
+try :
+    import pyvoro
+except:
+    pass
 
 from . import pbc
 from . import geo
 
 MDRecord = namedtuple("MDRecord",["time","value"])
+
+resanallib = {
+    "me" : {
+        'VAL' : [('CB','CG1'),('CB','CG2')],
+        'THR' : [('CB','CG2')],
+        'ILE' : [('CB','CG2'),('CG1','CD1')],
+        'LEU' : [('CG','CD1'),('CG','CD2')],
+        'MET' : [('SD','CE')],
+        'ALA' : [('CA','CB')]
+    },
+    "dict" : {
+        'VAL' : [("CB","CG1"),("CB","CG2")],
+        'SER' : [("CB","HB2"),("CB","HB3")],
+        'THR' : [("CB","CG2")],
+        'ILE' : [("CG1","CD1")],
+        'LEU' : [("CG","CD1"),("CG","CD2")],
+        'MET' : [("SD","CE")],
+        'ASN' : [("ND2","HD21"),("ND2","HD22")],
+        'GLN' : [("NE2","HE21"),("NE2","HE22")],
+        'PHE' : [("CD1","HD1")],
+        'HID' : [("CD2","HD2")],
+        'HIE' : [("CD2","HD2")],
+        'HIP' : [("CD2","HD2")],
+        'TYR' : [ ("CD1","HD1")],
+        'PRO' : [("CG","HG2"),("CG","HG3")],
+        'LYS' : [("CB","HB2"),("CB","HB3"),("CG","HG2"),("CG","HG3"),("CD","HD2"),("CD","HD3"),("CE","HE2"),("CE","HE3")],
+        'ARG' : [("CB","HB2"),("CB","HB3"),("CG","HG2"),("CG","HG3"),("CD","HD2"),("CD","HD3"),("NE","HE")],
+        'ASP' : [("CB","HB2"),("CB","HB3")],
+        'GLU' : [("CG","HG2"),("CG","HG3")],
+    }
+}
 
 class TrajectoryAction(object):
     """
@@ -67,12 +103,14 @@ class TrajectoryAction(object):
         """
         pass
 
-    def _write_records(self,postfix=''):
+    def _write_records(self, postfix='', headers=None):
         """
         Helper routine to write out a list of MDRecord to disc
         """
         if self.records :
             with open(self.out+postfix,'w') as f :
+                if headers is not None :
+                    f.write("#"+"\t".join(headers)+"\n")
                 for entry in self.records:
                     if isinstance(entry.value,float) or isinstance(entry.value,np.float32):
                         f.write("%.0f\t%.3f\n"%(entry.time,entry.value))
@@ -114,7 +152,7 @@ class CenterWholeAlign(TrajectoryAction):
 
     def setup(self, args):
         self.refuni = md.Universe(self.processor.args.struct)
-        self.protsel = self.processor.universe.selectAtoms(args.pmask)
+        self.protsel = self.processor.universe.select_atoms(args.pmask)
         if len(self.protsel) == 0 :
             self.nocenter = True
             self.noalign = True
@@ -125,7 +163,7 @@ class CenterWholeAlign(TrajectoryAction):
 
         self.residues = []
         self.residue_atoms = []
-        for res in self.processor.universe.selectAtoms("not "+args.pmask).residues:
+        for res in self.processor.universe.select_atoms("not "+args.pmask).residues:
             if len(res) > 1 :
                 self.residues.append(res)
             self.residue_atoms.append(ResidueAtoms(res[0].number,res[-1].number))
@@ -173,6 +211,56 @@ class CenterWholeAlign(TrajectoryAction):
         delta = com1 - self.processor.currbox/2.0
         self.processor.currsnap._pos = xyz - delta
 
+class ChainOrderAnalysis(TrajectoryAction):
+    """
+    Class to analyse chain order parameters during a trajectory
+
+    Attributes:
+    -----------
+    normal : numpy ndarray
+      the normal of the membrane, assumed to be z-axis
+    out : string
+      the output filename
+    selections : list of MDAnalysis.AtomGroup
+        the  selections
+    records : list of MDRecord
+        the chain orders at each timestep
+    """
+    def add_arguments(self, parser):
+        parser.add_argument('--selections',nargs="+", help="the chains")
+        parser.add_argument('-o', '--out', help="the output prefix", default="order.txt")
+
+    def setup(self, args):
+        self.selections = []
+        for selin in args.selections:
+            resname, chainlist = selin.split(":")
+            atomsels = [self.processor.universe.select_atoms("resname %s and name %s"%(resname,atom))
+                    for atom in chainlist.split("-")]
+            self.selections.append(atomsels)
+        self.out = args.out
+        # Assumes that the normal is along the z-axis
+        self.normal = np.array([0.0,0.0,1.0])
+        self.records = []
+
+    def process(self):
+
+        orders = []
+        for selection in self.selections :
+            for a1, a2 in zip(selection[:-1],selection[1:]):
+                orders.append(self._calc_order(a1 , a2, self.normal))
+        self.records.append(MDRecord(self.processor.currtime, orders))
+
+    def _calc_order(self,a1,a2,norm):
+        # Atom2 - Atom1
+        vec = a2.get_positions() - a1.get_positions()
+        # Projection with normal
+        proj = np.multiply(vec,norm).sum(axis=1)**2 / np.sum(vec**2,axis=1)
+        # Order param
+        return np.abs(0.5*(3.0*proj.mean()-1))
+
+    def finalize(self):
+        self._write_records()
+
 class IredAnalysis(TrajectoryAction):
     """
     Analysis class for iRED
@@ -197,109 +285,26 @@ class IredAnalysis(TrajectoryAction):
         parser.add_argument('--pmask',help="the selectiom mask for protein",default="protein")
         parser.add_argument('-o','--out',help="the output name",default="s2.txt")
         parser.add_argument('--resoffset',type=int,help="the residue offset",default=0)
-        parser.add_argument('--usedict',action="store_true",help="if to use dictionary vectors",default=False)
+        parser.add_argument('--uselib',choices=["no","dict","me"],help="if to use library vectors",default="no")
+
 
     def setup(self,args):
-        protsel = self.processor.universe.selectAtoms(args.pmask)
-        self.usedict = args.usedict
-        if not args.usedict:
-            self.atm2 = protsel.selectAtoms("name "+args.atoms[1])
-            self.atm1 = protsel.selectAtoms("name "+args.atoms[0]+
+        protsel = self.processor.universe.select_atoms(args.pmask)
+        self.uselib = args.uselib
+        if self.uselib == "no":
+            self.atm2 = protsel.select_atoms("name "+args.atoms[1])
+            self.atm1 = protsel.select_atoms("name "+args.atoms[0]+
                                         " and byres name "+args.atoms[1])
-        else:
+        elif self.uselib in resanallib :
+            lib = resanallib[self.uselib]
             atm1 = []
             atm2 = []
-            for res in self.processor.universe.selectAtoms("protein").residues:
-                if res.name == 'VAL' :
-                  atm1.append(res.CB)
-                  atm1.append(res.CB)
-                  atm2.append(res.CG1)
-                  atm2.append(res.CG2)
-                elif res.name == 'SER' :
-                  atm1.append(res.CB)
-                  atm1.append(res.CB)
-                  atm2.append(res.HB2)
-                  atm2.append(res.HB3)
-                elif res.name == 'THR' :
-                  atm1.append(res.CB)
-                  atm2.append(res.CG2)
-                elif res.name == 'ILE' :
-                  atm1.append(res.CG1)
-                  atm2.append(res.CD1)
-                elif res.name == 'LEU' :
-                  atm1.append(res.CG)
-                  atm1.append(res.CG)
-                  atm2.append(res.CD1)
-                  atm2.append(res.CD2)
-                elif res.name == 'MET' :
-                  atm1.append(res.SD)
-                  atm2.append(res.CE)
-                elif res.name == 'ASN' :
-                  atm1.append(res.ND2)
-                  atm1.append(res.ND2)
-                  atm2.append(res.HD21)
-                  atm2.append(res.HD22)
-                elif res.name == 'GLN' :
-                  atm1.append(res.NE2)
-                  atm1.append(res.NE2)
-                  atm2.append(res.HE21)
-                  atm2.append(res.HE22)
-                elif res.name == 'PHE' :
-                  atm1.append(res.CD1)
-                  atm2.append(res.HD1)
-                elif res.name == 'HID' or res.name == 'HIE' or res.name == 'HIP' :
-                  atm1.append(res.CD2)
-                  atm2.append(res.HD2)
-                elif res.name == 'TYR' :
-                  atm1.append(res.CD1)
-                  atm2.append(res.HD1)
-                elif res.name == 'PRO' :
-                  atm1.append(res.CG)
-                  atm1.append(res.CG)
-                  atm2.append(res.HG2)
-                  atm2.append(res.HG3)
-                elif res.name == 'LYS' :
-                  atm1.append(res.CB)
-                  atm1.append(res.CB)
-                  atm1.append(res.CG)
-                  atm1.append(res.CG)
-                  atm1.append(res.CD)
-                  atm1.append(res.CD)
-                  atm1.append(res.CE)
-                  atm1.append(res.CE)
-                  atm2.append(res.HB2)
-                  atm2.append(res.HB3)
-                  atm2.append(res.HG2)
-                  atm2.append(res.HG3)
-                  atm2.append(res.HD2)
-                  atm2.append(res.HD3)
-                  atm2.append(res.HE2)
-                  atm2.append(res.HE3)
-                elif res.name == 'ARG' :
-                  atm1.append(res.CB)
-                  atm1.append(res.CB)
-                  atm1.append(res.CG)
-                  atm1.append(res.CG)
-                  atm1.append(res.CD)
-                  atm1.append(res.CD)
-                  atm1.append(res.NE)
-                  atm2.append(res.HB2)
-                  atm2.append(res.HB3)
-                  atm2.append(res.HG2)
-                  atm2.append(res.HG3)
-                  atm2.append(res.HD2)
-                  atm2.append(res.HD3)
-                  atm2.append(res.HE)
-                elif res.name == 'ASP' :
-                  atm1.append(res.CB)
-                  atm1.append(res.CB)
-                  atm2.append(res.HB2)
-                  atm2.append(res.HB3)
-                elif res.name == 'GLU' :
-                  atm1.append(res.CG)
-                  atm1.append(res.CG)
-                  atm2.append(res.HG2)
-                  atm2.append(res.HG3)
+            for res in self.processor.universe.select_atoms("protein").residues:
+                if res.name not in lib :
+                    continue
+                for atompairs in lib[res.name]:
+                    atm1.append(res[atompairs[0]])
+                    atm2.append(res[atompairs[1]])
             self.atm2 = AtomGroup.AtomGroup(atm2)
             self.atm1 = AtomGroup.AtomGroup(atm1)
         self.mat = np.zeros([len(self.atm1),len(self.atm1)])
@@ -355,8 +360,9 @@ class IredAnalysis(TrajectoryAction):
             prevatom = None
             reslist = []
             for i,(atm,rs2) in enumerate(zip(self.atm1,self.s2list.T)):
-                if not self.usedict:
+                if self.uselib != "dict":
                     f.write("%s %d %.5f\n"%(atm.resname,atm.resnum+self.resoffset,rs2.mean()))
+                    #f.write("%s %d %s\n"%(atm.resname,atm.resnum+self.resoffset," ".join("%.5f"%v for v in rs2)))
                 else :
                     if reslist and atm.resnum != prevres:
                         av = np.asarray(reslist).mean()
@@ -365,7 +371,7 @@ class IredAnalysis(TrajectoryAction):
                     reslist.append(rs2.mean())
                     prevres = atm.resnum
                     prevatom = atm
-            if self.usedict:
+            if self.uselib == "dict":
                 av = np.asarray(reslist).mean()
                 f.write("%s %d %.5f\n"%(atm.resname,atm.resnum+self.resoffset,av))
 
@@ -379,9 +385,9 @@ class MempropAnalysis(TrajectoryAction):
 
     def setup(self,args):
         self.out = args.out
-        self.phosphorsel = self.processor.universe.selectAtoms(args.pmask)
-        self.lipidsel = self.processor.universe.selectAtoms(args.lipidmask)
-        watsel  = self.processor.universe.selectAtoms(args.watmask)
+        self.phosphorsel = self.processor.universe.select_atoms(args.pmask)
+        self.lipidsel = self.processor.universe.select_atoms(args.lipidmask)
+        watsel  = self.processor.universe.select_atoms(args.watmask)
         self.nlipid = len(self.lipidsel.residues)
         self.nwat = len(watsel.residues)
         self.watvol = args.watvol
@@ -394,7 +400,10 @@ class MempropAnalysis(TrajectoryAction):
         zpos = self.processor.universe.coord._pos[:,2] - self.lipidsel.positions[:,2].mean()
         self.resolution = 0.25
         self.edges = np.arange(zpos.min(),zpos.max()+self.resolution,self.resolution)
-        self.density = np.zeros(self.edges.shape)
+        self.density = np.zeros(self.edges.shape[0]+1)
+        # Setup arrays for RMSF calculations
+        self.sumcoords2 = np.zeros([nphosph,2])
+        self.sumcoords = np.zeros([nphosph,2])
         self.records = []
 
     def process(self):
@@ -408,7 +417,9 @@ class MempropAnalysis(TrajectoryAction):
         zpos = self.phosphorsel.positions[:,2] - self.lipidsel.positions[:,2].mean()
         for lipdig in np.digitize(zpos,self.edges) :
             self.density[lipdig] += 1
-        self.records.append(MDRecord(self.processor.currtime,[self.apllist[-1],self.vpllist[-1],self._calc_dhh()]))
+        self.sumcoords += self.phosphorsel.positions[:,:2]
+        self.sumcoords2 += self.phosphorsel.positions[:,:2]*self.phosphorsel.positions[:,:2]
+        self.records.append(MDRecord(self.processor.currtime,[self.apllist[-1],self.vpllist[-1],self._calc_dhh(),self._calc_rmsf()]))
 
     def finalize(self):
         """
@@ -418,8 +429,9 @@ class MempropAnalysis(TrajectoryAction):
         dhh = self._calc_dhh()
         apl = np.asarray(self.apllist).mean()
         vpl = np.asarray(self.vpllist).mean()
+        rmsf = self._calc_rmsf()
         with open(self.out+".txt","w") as f :
-            f.write("%.3f\t%.3f\t%.3f\n"%(apl,vpl,dhh))
+            f.write("%.3f\t%.3f\t%.3f\t%.3f\n"%(apl, vpl, dhh, rmsf))
         self._write_records(postfix="_dt.txt")
 
     def _calc_dhh(self) :
@@ -429,6 +441,102 @@ class MempropAnalysis(TrajectoryAction):
         max_first = np.argmax(dens_first)
         max_last = np.argmax(dens_last)
         return (max_last + mid - max_first) / 10.0 * self.resolution
+
+    def _calc_rmsf(self):
+        sumcoords = self.sumcoords / float(self.processor.nprocessed)
+        sumcoords2 = self.sumcoords2 / float(self.processor.nprocessed)
+        var = sumcoords2 - (sumcoords * sumcoords)
+        return var.sum(axis=1).mean()*0.01
+
+class MemVoronoiAnalysis(TrajectoryAction) :
+
+    def add_arguments(self, parser):
+        parser.add_argument('--mask',nargs="+",help="the selectiom mask for the atoms to do analysis on")
+        parser.add_argument('--head',help="the name of the atom to determine leaflets",default="PO4")
+        parser.add_argument('-o','--out',help="the output",default="memvoro")
+
+    def setup(self, args):
+        self.atoms = self.processor.universe.select_atoms(
+            " or ".join("name %s"%m for m in args.mask))
+        self.head = self.processor.universe.select_atoms("name %s"%args.head)
+        self.out = args.out
+        self.aplrecords = []
+        self.neighrecords = []
+        self.resnames = list(set([atom.resname for atom in self.atoms]))
+        self.respairs = []
+        for i, resname1 in enumerate(self.resnames):
+            for resname2 in self.resnames[i:]:
+                self.respairs.append(resname1+"-"+resname2)
+
+    def process(self):
+
+        midz = self.head.positions[:,2].mean()
+        lowsel = self.atoms.positions[:,2] < midz
+        uppsel = np.logical_not(lowsel)
+
+        celldim = [[0.0, self.processor.currbox[0]],
+                    [0.0, self.processor.currbox[1]]]
+
+        try :
+            lareas, lneighbours = self._process_leaflet(self.atoms[lowsel], celldim)
+            uareas, uneighbours = self._process_leaflet(self.atoms[uppsel], celldim)
+        except:
+            pass
+        else:
+            areas = 0.01 * 0.5 * (lareas + uareas)
+            neighbours = 0.5 * (lneighbours + uneighbours)
+
+            self.aplrecords.append(MDRecord(self.processor.currtime,areas))
+            self.neighrecords.append(MDRecord(self.processor.currtime,neighbours))
+
+    def _process_leaflet(self, atoms, celldim):
+
+        cells = pyvoro.compute_2d_voronoi(atoms.positions[:,:2],
+                celldim, 2.0, periodic=[True,True])
+
+
+        # Calculate the area per each residue type
+        areas = {resname : 0 for resname in self.resnames}
+        nres  = {resname : 0.0 for resname in self.resnames}
+        for atom, cell in zip(atoms, cells):
+            areas[atom.resname] += cell["volume"]
+            nres[atom.resname] += 1.0
+        areaout = np.asarray([areas[resname] / nres[resname] for resname in self.resnames])
+
+        # Calculate the neighbors
+        vsets = [set((np.round(v[0],3),np.round(v[1])) for v in cell["vertices"]) for cell in cells]
+        emptyset = set([])
+        neighbors = {respair : 0 for respair in self.respairs}
+        npairs = {respair : 0 for respair in self.respairs}
+        for i, ivertices in enumerate(vsets):
+            counts = {respair : 0 for respair in self.respairs}
+            for j, jvertices in enumerate(vsets[i+1:],i+1):
+                if ivertices & jvertices != emptyset :
+                    iresname = atoms[i].resname
+                    jresname = atoms[j].resname
+                    if iresname+"-"+jresname in neighbors:
+                        counts[iresname+"-"+jresname] += 1
+                    else:
+                        counts[jresname+"-"+iresname] += 1
+            for respair in self.respairs:
+                if counts[respair] > 0 :
+                    npairs[respair] += 1.0
+                    neighbors[respair] += counts[respair]
+        neighout = np.asarray([neighbors[respair] / npairs[respair]
+                                for respair in self.respairs])
+
+        return areaout, neighout
+
+    def finalize(self):
+        headers = ["Time"]
+        headers.extend(self.resnames)
+        self.records = self.aplrecords
+        self._write_records(postfix="_apl.txt", headers=headers)
+
+        headers = ["Time"]
+        headers.extend(self.respairs)
+        self.records = self.neighrecords
+        self._write_records(postfix="_neigh.txt", headers=headers)
 
 class PrincipalAxisAnalysis(TrajectoryAction):
     """
@@ -451,7 +559,7 @@ class PrincipalAxisAnalysis(TrajectoryAction):
         parser.add_argument('-o','--out',help="the output filename",default="alpha.txt")
 
     def setup(self,args):
-        self.selection = self.processor.universe.selectAtoms(args.mask)
+        self.selection = self.processor.universe.select_atoms(args.mask)
         self.masses = np.asarray([atom.mass for atom in self.selection])
         self.normal = np.asarray(args.normal)
         self.records = []
@@ -475,6 +583,28 @@ class PrincipalAxisAnalysis(TrajectoryAction):
         print "Mean = %.3f Std = %.3f"%(alphas.mean(),alphas.std())
         self._write_records()
 
+class RmsdAnalysis(TrajectoryAction) :
+
+    def add_arguments(self, parser):
+        parser.add_argument('--sel',help="the selectiom mask for the atoms to superpose",default="protein and (name C or name CA or name N)")
+        parser.add_argument('-o','--out',help="the output",default="rmsd.out")
+
+    def setup(self, args):
+        self.refuni = md.Universe(self.processor.args.struct)
+        self.sel = args.sel
+        print "Will superpose %d atoms"%len(
+            self.processor.universe.select_atoms(args.sel))
+        self.out = args.out
+        self.records = []
+
+    def process(self):
+        rmsd = align.alignto(self.processor.universe, self.refuni,
+                            select=self.sel)[1]
+        self.records.append(MDRecord(self.processor.currtime,rmsd*0.1))
+
+    def finalize(self):
+        self._write_records()
+
 class RMSFAnalysis(TrajectoryAction):
     """
     Class to analyse the RMSF of selected residues
@@ -494,21 +624,26 @@ class RMSFAnalysis(TrajectoryAction):
     """
     def add_arguments(self, parser):
         parser.add_argument('--atoms',nargs="+",help="the atom names in the  backbone",default=["CA","N","C"])
+        parser.add_argument('--fitsel',help="the selectiom mask for the atoms to superpose",default="protein and (name C or name CA or name N)")
         parser.add_argument('--pmask',help="the selectiom mask for protein",default="protein")
+        parser.add_argument('--uselib',choices=["no","dict","me"],help="if to use library vectors",default="no")
+        parser.add_argument('--resoffset',type=int,help="the residue offset",default=0)
         parser.add_argument('-o','--out',help="the output",default="rmsf.txt")
 
     def setup(self, args):
         self.refuni = md.Universe(self.processor.args.struct)
-        self.protsel = self.processor.universe.selectAtoms(args.pmask)
+        self.protsel = self.processor.universe.select_atoms(args.pmask)
         self.atoms = args.atoms
-        self.alignmask = "%s"%(" or ".join("name %s"%a for a in args.atoms))
+        self.fitsel = args.fitsel
         natm = len(self.processor.universe.atoms)
         self.sumcoords2 = np.zeros([natm,3])
         self.sumcoords = np.zeros([natm,3])
         self.out = args.out
+        self.uselib = args.uselib
+        self.resoffset = args.resoffset
 
     def process(self):
-        rmsd = align.alignto(self.processor.universe, self.refuni, select=self.alignmask)
+        rmsd = align.alignto(self.processor.universe, self.refuni, select=self.fitsel)
         xyz = self.processor.currsnap._pos
         self.sumcoords += xyz
         self.sumcoords2 += xyz*xyz
@@ -518,17 +653,43 @@ class RMSFAnalysis(TrajectoryAction):
         self.sumcoords = self.sumcoords / nsnap
         self.sumcoords2 = self.sumcoords2 / nsnap
         var = self.sumcoords2 - (self.sumcoords * self.sumcoords)
-        bfac = (8.0/3.0)*np.pi*np.pi*var.sum(axis=1)
+        bfac = (8.0/3.0)*np.pi*np.pi*var.sum(axis=1)*0.01 # Make the variance into nm^2
 
         with open(self.out,'w') as f:
             for residue in self.protsel.residues:
-                rbfac = 0.0
-                masssum = 0.0
-                for atom in residue:
-                    if atom.name not in self.atoms : continue
-                    rbfac = bfac[atom.number]*atom.mass
-                    masssum += atom.mass
-                f.write("%d %.3f\n"%(residue.id,rbfac / masssum))
+                if self.uselib == "no" :
+                    rbfac = 0.0
+                    masssum = 0.0
+                    for atom in residue:
+                        if atom.name not in self.atoms : continue
+                        rbfac = bfac[atom.number]*atom.mass
+                        masssum += atom.mass
+                    f.write("%s %d %.3f\n"%(atom.resname,atom.resnum+self.resoffset,rbfac / masssum))
+                elif self.uselib in resanallib:
+                    lib = resanallib[self.uselib]
+                    if residue.name not in lib:
+                        continue
+                    atomnames = [pair[0] for pair in lib[residue.name]]
+                    for atom in residue:
+                        if atom.name not in atomnames : continue
+                        f.write("%s %d %.3f\n"%(atom.resname,atom.resnum+self.resoffset,bfac[atom.number]))
+
+class StripAtoms(TrajectoryAction) :
+
+    def add_arguments(self, parser):
+        parser.add_argument('--sel',help="the selectiom mask for the atoms to strip")
+        parser.add_argument('-o','--out',help="the output",default="stripped.dcd")
+
+    def setup(self, args):
+        self.sel = self.processor.universe.select_atoms("not ("+args.sel+")")
+        print "Will save %d atoms to the new trajectory"%len(self.sel)
+        notsel = self.processor.universe.select_atoms(args.sel)
+        print "Will remove %d atoms"%len(notsel)
+        self.writer = md.Writer(args.out,len(self.sel))
+        self.out = args.out
+
+    def process(self):
+        self.writer.write(self.sel)
 
 class VectorPlaneAngleAnalysis(TrajectoryAction):
     """
@@ -551,10 +712,10 @@ class VectorPlaneAngleAnalysis(TrajectoryAction):
         parser.add_argument('-o','--out',help="the output filename",default="angle.txt")
 
     def setup(self, args):
-        self.atom1 = self.processor.universe.selectAtoms(args.atoms[0])
+        self.atom1 = self.processor.universe.select_atoms(args.atoms[0])
         if len(self.atom1) == 0:
             raise Exception("Selection %s did not select any atoms"%args.atoms[0])
-        self.atom2 = self.processor.universe.selectAtoms(args.atoms[1])
+        self.atom2 = self.processor.universe.select_atoms(args.atoms[1])
         if len(self.atom2) == 0:
             raise Exception("Selection %s did not select any atoms"%args.atoms[1])
         elif len(self.atom2) != len(self.atom1):
