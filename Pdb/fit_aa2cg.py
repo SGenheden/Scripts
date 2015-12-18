@@ -25,7 +25,7 @@ if __name__ == '__main__' :
 
   aastruct = pdb.PDBFile()
   aastruct.read(args.aa)
-      
+
   cgstruct = pdb.PDBFile()
   cgstruct.read(args.cg)
 
@@ -44,13 +44,13 @@ if __name__ == '__main__' :
     i = i + 1
 
   # Collect the reference atoms, i.e. the BB beads
-  ref = np.zeros([nres,3]) 
+  ref = np.zeros([nres,3])
   for i,res in enumerate(cgstruct.residues) :
     for atom in res.atoms :
       if atom.name.strip() == "BB" :
         ref[i,:] = atom.xyz
         break
-  
+
   print "Initial RMSD=",np.sqrt(np.mean(np.sum((mob-ref)**2,axis=1)))
 
   xyz2 = fitting.dofit(ref,mob,aastruct.xyz)
@@ -60,6 +60,5 @@ if __name__ == '__main__' :
     aastruct.atoms[i].y = c[1]
     aastruct.atoms[i].z = c[2]
     aastruct.atoms[i].xyz = c
-
+    
   aastruct.write_gro(args.out)
-  
