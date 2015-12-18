@@ -8,6 +8,16 @@ import math
 
 import numpy as np
 
+def sphere_rand(r) :
+  """
+  Random number on sphere with radius r
+  """
+  z = np.random.uniform(low=-r,high=r)
+  phi = np.random.uniform(low=0,high=2.0*np.pi)
+  theta = np.arcsin(z/r)
+  x=r*np.cos(theta)*np.cos(phi)
+  y=r*np.cos(theta)*np.sin(phi)
+  return np.array([x,y,z])
 
 def vnorm(v) :
   """

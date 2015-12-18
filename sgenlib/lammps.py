@@ -18,6 +18,8 @@ from ConfigParser import SafeConfigParser
 
 import numpy as np
 
+from sgenlib import geo
+
 def get_filename(filename) :
   """
   Returns a filename in the directory of this python file
@@ -1203,17 +1205,6 @@ class ResidueConverter :
       the coordinates of the CG beads
     """
 
-    def sphere_rand(r) :
-      """
-      Random number on sphere with radius r
-      """
-      z = np.random.uniform(low=-r,high=r)
-      phi = np.random.uniform(low=0,high=2.0*np.pi)
-      theta = np.arcsin(z/r)
-      x=r*np.cos(theta)*np.cos(phi)
-      y=r*np.cos(theta)*np.sin(phi)
-      return np.array([x,y,z])
-
     # Find and build up the coordinates for each CG bead
     if mapping :
       coords = [np.zeros(3) for name in self.cg_names]
@@ -1242,7 +1233,7 @@ class ResidueConverter :
       atom = Atom(record=self.creates[name]%(len(data.atoms)+1,coords[i][0],coords[i][1],coords[i][2],molidx))
       r = np.sqrt(np.sum(atom.mu**2))
       if r > 0 :
-        vec = sphere_rand(r)
+        vec = geo.sphere_rand(r)
         rnew = np.sqrt(np.sum(vec**2))
         if abs(rnew - r) > 0.001 : print "Failed: %.3f %.3f %.3E"%(r,rnew,rnew-r)
         atom.set_mu(vec)
