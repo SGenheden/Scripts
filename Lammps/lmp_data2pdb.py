@@ -20,7 +20,7 @@ from sgenlib import pbc
 
 class AtomSelection :
   """
-  Class to store atom names, residue names and connectivity for 
+  Class to store atom names, residue names and connectivity for
   a selection of datafile atoms
 
   Attributes
@@ -50,7 +50,7 @@ class AtomSelection :
     self.first = int(first)
     self.last = int(last)
 
-    # Parse the name    
+    # Parse the name
     internal_res = {res.name.strip().lower() : res.cg_names for res in converter.residues}
     internal_bonds = {res.name.strip().lower()+"_bonds" : res.bonds for res in converter.residues}
     if nam.strip().lower() in internal_res :
@@ -78,8 +78,8 @@ class AtomSelection :
     if self.first == self.last :
       ok = atom.molecule == self.first
     else :
-      ok = self.first <= atom.molecule and self.last >= atom.molecule    
-    return ok    
+      ok = self.first <= atom.molecule and self.last >= atom.molecule
+    return ok
 
 
 if __name__ == '__main__' :
@@ -104,7 +104,7 @@ if __name__ == '__main__' :
     converter.read(args.converter)
 
   # Create input and output objects
-  data = lammps.Datafile(filename=args.file)  
+  data = lammps.Datafile(filename=args.file)
   pdbfile = pdb.PDBFile()
 
   # Create AtomSelection objects
@@ -112,7 +112,7 @@ if __name__ == '__main__' :
 
   # Split atoms into molecule
   mols,mollist = lammps.parse_molecules(data,order=True)
-  
+
   # Loop over all molecules and build the PDB structure
   bonds = []
   group_fix = []
@@ -121,7 +121,7 @@ if __name__ == '__main__' :
     atoms = mols[m]
     selection = None
     for s in selections :
-      if s.checkout(atoms[0]) : 
+      if s.checkout(atoms[0]) :
         selection = s
         break
     if selection is None :
@@ -144,25 +144,25 @@ if __name__ == '__main__' :
       n = len(pdbfile.atoms)
       for b in selection.bonds :
         bonds.append([b[0]+n,b[1]+n])
-      pdb.make_pdbres(np.array(coords),selection.atom_names,selection.resname,pdbfile)  
+      pdb.make_pdbres(np.array(coords),selection.atom_names,selection.resname,pdbfile)
       group_mob.append(pdbfile.residues[-1])
   pdbfile.renumber(doresidues=args.renumber)
-  
+
   # Add box
   pdbfile.box = np.zeros(3)
   pdbfile.box[0] = data.box[3]-data.box[0]
   pdbfile.box[1] = data.box[4]-data.box[1]
   pdbfile.box[2] = data.box[5]-data.box[2]
-  
+
   # Make each residue whole
   do_fixedgroup = args.fixed and len(group_fix) > 0
   if args.whole or do_fixedgroup :
     print "Making residues whole"
     if do_fixedgroup :
-      pbc.make_whole(group_fix,pdbfile.box,1)
+      pbc.make_whole(group_fix,pdbfile.box)
     for residue in pdbfile.residues :
       if len(residue.atoms) == 1 : continue
-      pbc.make_whole(residue.atoms,pdbfile.box,2)
+      pbc.make_whole(residue.atoms,pdbfile.box)
     if do_fixedgroup :
       print "Center fixed group"
       pbc.center(group_fix,group_mob,pdbfile.box)
@@ -183,7 +183,7 @@ if __name__ == '__main__' :
     delta_com = xyz_com - pdbfile.box / 2.0
     for atom in pdbfile.atoms :
       atom.set_xyz(atom.xyz-delta_com)
-             
+
   # Write out the PDB file
   if args.out is None :
     s1,s2 = os.path.splitext(args.file)
@@ -193,4 +193,4 @@ if __name__ == '__main__' :
   def add_con(pdbfile,f) :
     for bnd in bonds :
       f.write("CONECT%5d%5d\n"%(bnd[0],bnd[1]))
-  pdbfile.write(args.out,ter=True,add_extra=add_con) 
+  pdbfile.write(args.out,ter=True,add_extra=add_con)

@@ -9,7 +9,7 @@ as such.
 The --beads argument is a list of bead specification, each one contains a comma-separated
 list of atom types. The pairs between these atom types and AA types will be scaled.
 
-The --scale argument is the scaling factor and --param can be either e, s, or c, 
+The --scale argument is the scaling factor and --param can be either e, s, or c,
 indicating scaling epsilon, sigma (vdW parameters) or Coulomb potential.
 
 The default output is the input include file with a "_scaled" string appended
@@ -52,7 +52,7 @@ if __name__ == '__main__' :
   for beadspec,fac,param in zip(args.beads,args.scale,args.param) :
     beads = [int(b) for b in beadspec.strip().split(",")]
     for pair in mixed_pairs :
-      if pair.iatom in beads : 
+      if pair.iatom in beads :
         if param.lower()[0] == "e" :
           new = fac*np.sqrt(lj_same[pair.iatom].epsilon*lj_same[pair.jatom].epsilon)
           pair.epsilon = new
@@ -61,11 +61,8 @@ if __name__ == '__main__' :
           pair.sigma = new
         elif param.lower()[0] == "c" :
           pair.scale = fac
-  
-  # Write output        
+
+  # Write output
   if args.out is None :
     args.out = args.file+"_scaled"
   infile.write(args.out)
-
- 
-  
