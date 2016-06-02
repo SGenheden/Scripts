@@ -8,12 +8,13 @@ to analyse GPCR simulations
 import os
 import sys
 import struct
-from ConfigParser import SafeConfigParser 
+from ConfigParser import SafeConfigParser
 
 import numpy as np
 from scipy.spatial.distance import cdist
-import MDAnalysis.core.distances as distances
-from MDAnalysis.KDTree.NeighborSearch import CoordinateNeighborSearch
+from scipy.ndimage.measurements import center_of_mass
+import MDAnalysis.lib.distances as distances
+from Bio.KDTree import KDTree
 import matplotlib as plt
 
 # Import the PDB and Plot modules
@@ -21,7 +22,7 @@ from sgenlib import pdb
 from sgenlib import colors
 
 # Change this to load protein template and Xray structures from a different location
-PROT_INFO_PATH = "/home/sg6e12/Dropbox/Research/GPCR/Prot_info/"
+PROT_INFO_PATH = "/Users/samuel/Dropbox/Research/GPCR/Prot_info/"
 
 # Labels for the lower and upper densities
 side_name = {"low":"intra.","upp":"extra."}
@@ -29,7 +30,7 @@ side_name = {"low":"intra.","upp":"extra."}
 class GridTemplate(object) :
   """
   Class to store the template of 2D grid
-  
+
   Attributes
   ----------
   resolution : float
@@ -82,7 +83,7 @@ class GridTemplate(object) :
   def save(self,mats,size,filename) :
     """
     Save a dictionary of matrices to a npz-file
-    
+
     Truncates them to a specific size
     """
     mats2 = {}
@@ -102,13 +103,13 @@ class GridTemplate(object) :
     highx = centx+size
     highy = centy+size
     return mat[lowx:highx,lowy:highy]
- 
+
 class ProteinTemplate(object) :
   """
   Class to store residue and atom
-  template information for a protein. 
+  template information for a protein.
   This include translation from internal indices to Xray indices
-  
+
   Attributes
   ----------
   residues : list of integers
@@ -125,41 +126,42 @@ class ProteinTemplate(object) :
     the first and last residue indices for residue ranges
   """
   def __init__(self,filename) :
-    
+
     parser = SafeConfigParser()
     parser.read(filename)
-    
+
     self.residues = map(int,parser.get("Residue match","Numbers-ref").split())
     self.mob2ref = {}
     for r in self.residues :
       v = int(parser.get("Residue match","%d"%r))
       self.mob2ref[v] = r
-    
+
     self.codes = parser.get("Residue names","Codes").split()
     self.names = parser.get("Residue names","Names").split()
-    
+
     deflist = parser.get("Residue ranges","Def-list")[1:-1]
     deflist = deflist.replace(", ",":")
     self.rhelices = []
     for d in deflist.split(",") :
       r1,r2 = d[1:-1].split(":")
       self.rhelices.append([int(r1),int(r2)])
-      
+
     defalist = parser.get("Residue ranges","Def-atom-list")[1:-1]
     defalist = defalist.replace(", ",":")
     self.helices = []
     for d in defalist.split(",") :
       a1,a2 = d[1:-1].split(":")
-      self.helices.append([int(a1),int(a2)]) 
-    
+      self.helices.append([int(a1),int(a2)])
+
 ####################
 # Analysis routines
 ####################
 
-def anal_contacts(prot,rfirst,mols,cutoff,midz,box,molfile,resfile,burresfile=None,buried=None) :
+def anal_contacts(prot,rfirst,mols,cutoff,midz,box,molfile,resfile,
+                    burresfile=None,buried=None,reslist=None,reslistfile=None) :
   """
   Calculates a range of contacts and write out contact vectors to files
-  
+
   Parameters
   ----------
   prot : AtomSelection
@@ -182,53 +184,65 @@ def anal_contacts(prot,rfirst,mols,cutoff,midz,box,molfile,resfile,burresfile=No
     the file to write buried residue contacts to
   buried : NumpyArray of boolean, optional
     flag to indicate buried molecule
+  reslist : list
+    a list of residues to write out individual mol contacts
+  reslistfile : fileobject
+    the file to write out individual mol contacts to
   """
   molon = np.zeros(len(mols),dtype=bool)
   reson = np.zeros(len(rfirst)-1,dtype=bool)
-  if buried is not None : 
+  if buried is not None :
     burreson = np.zeros(len(rfirst)-1,dtype=bool)
-  
+  if reslist is not None :
+    resonlist = np.zeros([len(reslist),len(mols)],dtype=bool)
+
   # Calculate all distances at once
   if box is not None :
     dist_all = distances.distance_array(np.array(mols), prot.get_positions(), box)
   else :
-    CNS = CoordinateNeighborSearch(prot.get_positions())
-  
+    kdtree = KDTree(dim=3, bucket_size=10)
+    kdtree.set_coords(prot.get_positions())
+
   # Loop over all molecules
-  for mi,mol in enumerate(mols) :   
+  for mi,mol in enumerate(mols) :
     if box is not None :
       dist = dist_all[mi,:]
     else :
       dist = np.ones(prot.get_positions().shape[0])+cutoff
-      for i in CNS.search_list(np.array([mol]),cutoff) : dist[i] = 0.0 
-    
+      kdtree.search(np.array([mol]), cutoff)
+      for i in kdtree.get_indices() : dist[i] = 0.0
+
     # Check if this molecule is on
     molon[mi] = dist.min() < cutoff
     if  molon[mi] :
       # Check contacts for reach residue
       for i in range(len(rfirst)-1) :
         if dist[rfirst[i]:rfirst[i+1]].min() < cutoff :
-          if (burresfile is not None and buried[mi]) : 
-            burreson[i] = True  
+          if (burresfile is not None and buried[mi]) :
+            burreson[i] = True
           else :
-            reson[i] = True        
+            reson[i] = True
+          if reslist is not None and i in reslist:
+            resonlist[reslist.index(i),mi] = True
 
   # Write state information to file
   write_booleans(molfile,molon)
   write_booleans(resfile,reson)
   if buried is not None :
     write_booleans(burresfile,burreson)
+  if reslist is not None:
+    write_booleans(reslistfile,resonlist.reshape(len(reslist)*len(mols)))
 
 def anal_density(low_sel,count,grid,mat,buried=None,**kwargs) :
   """
   Put the coordinates of molecules on a grid
-  
+
   By default, two grids are accumulated; one for the molecules in the lower leaflet
   and one for the molecules in the upper leaflet
   If buried is given, the split of the molecules is made three-fold, in addition to
   molecules in the lower and upper leaflet, molecules in the middle of the bilayer
   is put on a separate grid. These molecules are not put on any other grid.
-  
+
   Parameters
   ----------
   low_sel : NumpyArray of booleans
@@ -245,8 +259,8 @@ def anal_density(low_sel,count,grid,mat,buried=None,**kwargs) :
   **kwargs : dictionary of NumpyArrays
     can be either a discretised coordinates or Cartesian coordinates
   """
-   
-  # Select molecule in the upper leaflet as the negative of the selection in 
+
+  # Select molecule in the upper leaflet as the negative of the selection in
   # lower leaflet
   upp_sel = np.logical_not(low_sel)
   if buried is not None :
@@ -257,15 +271,15 @@ def anal_density(low_sel,count,grid,mat,buried=None,**kwargs) :
     mat["cnt_"+count][2] = mat["cnt_"+count][2] + buried.sum()
   mat["cnt_"+count][0] = mat["cnt_"+count][0] + low_sel.sum()
   mat["cnt_"+count][1] = mat["cnt_"+count][1] + upp_sel.sum()
-    
+
   # Now accumulate grids for each molecule
   for k in kwargs :
-    if "low_"+k not in mat : continue 
+    if "low_"+k not in mat : continue
     # v can either be a 2 x n array in case it is assumed to be discretised coordinates
     # if v is a n x 3 array it is assumed to be Cartesian coordinates
     v = kwargs[k]
     # If it is Cartesian coordinates, we need to discretise it first
-    if v.shape[1] == 3 : 
+    if v.shape[1] == 3 :
       v = grid.indices(v)
     lidx = v[:,low_sel]
     uidx = v[:,upp_sel]
@@ -278,7 +292,7 @@ def anal_density(low_sel,count,grid,mat,buried=None,**kwargs) :
 def anal_jointdist(prot,rfirst,mols,cutoff,midz,box,mat,matburr,buried=None) :
   """
   Calculates the joint probability of residue interactions
-  
+
   Parameters
   ----------
   prot : AtomSelection
@@ -299,51 +313,53 @@ def anal_jointdist(prot,rfirst,mols,cutoff,midz,box,mat,matburr,buried=None) :
     the joint probability for buried molecules
   buried : NumpyArray of boolean, optional
     flag to indicate buried molecule
-  """  
+  """
   imat = np.zeros(mat.shape)
   imatburr = np.zeros(matburr.shape)
-  
+
   # Calculate all distances at once
   if box is not None :
     dist_all = distances.distance_array(np.array(mols), prot.get_positions(), box)
   else :
-    CNS = CoordinateNeighborSearch(prot.get_positions())
-  
+    kdtree = KDTree(dim=3, bucket_size=10)
+    kdtree.set_coords(prot.get_positions())
+
   # Loop over all molecules
-  for mi,mol in enumerate(mols) :   
+  for mi,mol in enumerate(mols) :
     if box is not None :
       dist = dist_all[mi,:]
     else :
       dist = np.ones(prot.get_positions().shape[0])+cutoff
-      for i in CNS.search_list(np.array([mol]),cutoff) : dist[i] = 0.0 
-    
+      kdtree.search(np.array([mol]), cutoff)
+      for i in kdtree.get_indices() : dist[i] = 0.0
+
     # Check if this molecule is on
     if dist.min() >= cutoff : continue
 
     # Check contacts for reach residue
     for i in range(len(rfirst)-1) :
       if dist[rfirst[i]:rfirst[i+1]].min() >= cutoff : continue
-      if (buried is not None and buried[mi]) : 
-        imatburr[i,i] = 1  
+      if (buried is not None and buried[mi]) :
+        imatburr[i,i] = 1
       else :
-        imat[i,i] = 1  
-      
+        imat[i,i] = 1
+
       for j in range(i+1,len(rfirst)-1) :
         if dist[rfirst[j]:rfirst[j+1]].min() >= cutoff : continue
 
-        if (buried is not None and buried[mi]) : 
-          imatburr[i,j] = 1  
-          imatburr[j,i] = 1  
+        if (buried is not None and buried[mi]) :
+          imatburr[i,j] = 1
+          imatburr[j,i] = 1
         else :
-          imat[i,j] = 1  
-          imat[j,i] = 1  
+          imat[i,j] = 1
+          imat[j,i] = 1
 
   return (mat+imat,matburr+imatburr)
-      
+
 def anal_orderparams(heads,head_idx,midz,bonds,mat) :
   """
   Computes the tail order parameters
-  
+
   Parameters
   ----------
   heads : AtomSelection
@@ -356,7 +372,7 @@ def anal_orderparams(heads,head_idx,midz,bonds,mat) :
     the bond selections
   mat : dictionary of NumpyArray
     the accumulate grids
-    this will be modified 
+    this will be modified
   """
   def calc_orderparam(atoms1,atoms2,norm) :
     """
@@ -371,7 +387,7 @@ def anal_orderparams(heads,head_idx,midz,bonds,mat) :
   upp_sel = np.logical_not(low_sel)
   lidx = head_idx[:,low_sel]
   uidx = head_idx[:,upp_sel]
-  
+
   for bi,bond in enumerate(bonds) :
     atoms1 = bond[0].get_positions()
     atoms2 = bond[1].get_positions()
@@ -385,12 +401,12 @@ def anal_orderparams(heads,head_idx,midz,bonds,mat) :
 
     # Calculate the order parameter of the bond in the upper leaflet
     mat["upp_sum"][uidx[0],uidx[1],bi]= mat["upp_sum"][uidx[0],uidx[1],bi] + calc_orderparam(atoms1[upp_sel,:],atoms2[upp_sel,:],bilayer_norm)
-    mat["upp_count"][uidx[0],uidx[1],bi] = mat["upp_count"][uidx[0],uidx[1],bi]  + 1 
+    mat["upp_count"][uidx[0],uidx[1],bi] = mat["upp_count"][uidx[0],uidx[1],bi]  + 1
 
 def anal_savemols(selection,nsnap,crd) :
   """
   Write out a selection of residues in xyz format
-  
+
   Parameters
   ----------
   selection : AtomGroup
@@ -406,11 +422,11 @@ def anal_savemols(selection,nsnap,crd) :
     crd["file"].write("%d\n%d:%d\n"%(len(residue),mdcrd["frame"],nsnap))
     for atom in residue :
       crd["file"].write("%s %.3f %.3f %.3f\n"%(atom.name,atom.position[0],atom.position[1],atom.position[2]))
-      
+
 def anal_thickness(heads,head_idx,box,midz,mat) :
   """
   Computes the bilayer thickness and discretise it on a grid
-  
+
   Parameters
   ----------
   heads : AtomSelection
@@ -421,7 +437,7 @@ def anal_thickness(heads,head_idx,box,midz,mat) :
     the middle of the bilayer
   mat : dictionary of NumpyArray
     the accumulate grids
-    this will be modified 
+    this will be modified
   """
   def calc_zdist(coords1,coords2) :
     """
@@ -437,15 +453,15 @@ def anal_thickness(heads,head_idx,box,midz,mat) :
   uidx = head_idx[:,upp_sel]
   low_coords = heads.get_positions()[low_sel,:]
   upp_coords = heads.get_positions()[upp_sel,:]
- 
-  # Calculate the thickness from the point of view of the lower leaflet 
+
+  # Calculate the thickness from the point of view of the lower leaflet
   zdist = calc_zdist(low_coords,upp_coords)
   mat["lower"][lidx[0],lidx[1]] = np.minimum(zdist,mat["lower"][lidx[0],lidx[1]])
 
   # Calculate the thickness from the point of view of the upper leaflet
   zdist = calc_zdist(upp_coords,low_coords)
   mat["upper"][uidx[0],uidx[1]] = np.minimum(zdist,mat["upper"][uidx[0],uidx[1]])
-   
+
 ####################
 # Density routines
 ####################
@@ -481,11 +497,11 @@ class Density :
     self.nmat = 1
     self.excluded = np.ones(mat.shape)
     self.excluded[mat>0] = 0.0
-    self._excluded_im = None 
+    self._excluded_im = None
     self.av = None
     self.std = None
     self.dg = None
-    self.dge = None   
+    self.dge = None
     if "nsnap" in kwargs :
       self.nsnap = np.zeros(nfiles)
       self.nsnap[0] = kwargs["nsnap"]
@@ -528,12 +544,12 @@ class Density :
     temp : float, optional
       the temperature in Kelvin
     """
-    if self.av == None :
+    if self.av is None :
       self.average()
-    factor = 1.0 #-1.987*temp/1000.0*4.184
+    factor = -1.987*temp/1000.0*4.184
     self.dg = np.zeros(self.av.shape)
     self.dge = np.zeros(self.av.shape)
-    if cutoff == None :
+    if cutoff is None :
       cutoff = 0.0
     else :
       sel = self.av < cutoff
@@ -541,6 +557,11 @@ class Density :
     sel = self.av > cutoff
     self.dg[sel] = factor*np.log(self.av[sel])
     self.dge[sel] = factor*np.divide(self.std[sel],self.av[sel])
+  def centroid(self, rotate2D=None):
+    if rotate2D is None:
+        return center_of_mass(self.excluded)
+    else:
+        return center_of_mass(rotate2D(self.excluded))
   def cutoff_av(self,cutoff) :
     """
     Set average density below a cut-off to that cut-off value
@@ -564,7 +585,7 @@ class Density :
     Creates white image for excluded density voxels, and sets alpha values to
     1 (opaque). However, for voxels that has density the alpha value is set to 0.0 (transparent)
     """
-    if self._excluded_im == None :
+    if self._excluded_im is None :
       self._excluded_im = np.ones([self.excluded.shape[0],self.excluded.shape[1],4])
       self._excluded_im[self.excluded==0.0,3] = 0.0
     return self._excluded_im
@@ -584,23 +605,23 @@ class Density :
     """
     Returns the maximum of a specific density matrix, excluding zero density voxels
     """
-    if self.av == None : self.average()
+    if self.av is None : self.average()
     density = self._get_mat(mat)
     return density[density!=0.0].max()
   def min(self,mat) :
     """
     Returns the minimum of a specific density matrix, excluding zero density voxels
     """
-    if self.av == None : self.average()
+    if self.av is None : self.average()
     density = self._get_mat(mat)
     return density[density!=0.0].min()
-  def plot(self,mat,axis,cmap,minval,maxval=None,reverseY=True) :
+  def plot(self,mat,axis,cmap,minval,maxval=None,reverseY=True, rotate2D=None) :
     """
     Plot the density
 
     Attributes
     ----------
-    mat : string 
+    mat : string
       the density to plot
     axis : Axis object
       the axis to do the plotting on
@@ -612,18 +633,21 @@ class Density :
       the maximum value of the density to plot
     reverseY : bool, optional
       whether to flip Y axis
-
+    rotate2D : func, optional
+      function to rotate the density in 2D
     Returns
     -------
     the image instance returned by imshow
     """
     density = self._get_mat(mat)
+    if rotate2D is not None : density = rotate2D(density)
     if reverseY : density = density[:,::-1]
-    if maxval == None :
+    if maxval is None :
       im =  axis.imshow(density,cmap=cmap,vmin=minval,extent=(-35,35,-35,35),origin="lower")
     else :
       im = axis.imshow(density,cmap=cmap,vmin=minval,vmax=maxval,extent=(-35,35,-35,35),origin="lower")
     density = np.array(self.excluded_im(),copy=True)
+    if rotate2D is not None : density = rotate2D(density)
     if reverseY : density = density[:,::-1]
     axis.imshow(density,extent=(-35,35,-35,35),origin="lower")
     return im
@@ -636,7 +660,7 @@ class Density :
       for i in range(self.nmat) :
         self.mat[i,:,:] = self.mat[i,:,:] / self.nsnap[i]
     else :
-      self.mat = self.mat / float(factor)    
+      self.mat = self.mat / float(factor)
   def scale_by_uniform(self,nmol=None,boxlen=None,multifac=1) :
     """
     Scale all densities by uniform density in a box, excluding non-occupying voxels
@@ -644,11 +668,11 @@ class Density :
     if boxlen is None : boxlen = float(self.mat.shape[1])
     if nmol is None :
       if self.molcount is None : return
-      uniform_density = self.molcount / float(boxlen*boxlen - self.excluded.sum()) 
+      uniform_density = self.molcount / float(boxlen*boxlen - self.excluded.sum())
       for i in range(self.nmat) :
         self.mat[i,:,:] = self.mat[i,:,:] / uniform_density[i]
     else :
-      uniform_density = float(nmol)/float(boxlen*boxlen - self.excluded.sum()) 
+      uniform_density = float(nmol)/float(boxlen*boxlen - self.excluded.sum())
       self.mat = self.mat / (multifac * uniform_density)
   def subtract(self,mat,tosubtract) :
     """ Subtract the density from another density
@@ -675,9 +699,9 @@ class Density :
       self.std = self.std[lowx:highx,lowy:highy]
     if not self.dg is None :
       self.dg = self.dg[lowx:highx,lowy:highy]
-      self.dge = self.dge[lowx:highx,lowy:highy]  
+      self.dge = self.dge[lowx:highx,lowy:highy]
   def export(self,mat) :
-    return self._get_mat(mat),np.array(self.excluded_im(),copy=True)      
+    return self._get_mat(mat),np.array(self.excluded_im(),copy=True)
 
 class Densities :
   """
@@ -801,7 +825,7 @@ class XrayDensity :
     protflag = []
     self.pdbfile = pdb.PDBFile(filename)
     flag = {"BB" : 1, "SC" :-1}
-    for atom in self.pdbfile.atoms : 
+    for atom in self.pdbfile.atoms :
       if atom.resname[0:3] == "CHO" :
         cholxyz.append(atom.xyz)
       elif atom.name.strip()[:2] in ["BB","SC"] :
@@ -820,7 +844,7 @@ class XrayDensity :
          self.cholleaf = "low"
        else :
          self.cholleaf = "upp"
- 
+
     # Optionally, read a file of Lennard-Jones sigma parameters
     if sigmafile is None :
       self.sigmas = np.ones(self.protxyz.shape[0])*2.3
@@ -832,11 +856,12 @@ class XrayDensity :
           self.sigmas.append(float(line.strip()))
           line = f.readline()
       self.sigmas = np.array(self.sigmas)
-      
-  def plot(self,axis,leaflet,reverseY=True,sigmas=None,sidechain=False,colorscheme=None,drawchol=True) :
+
+  def plot(self,axis, leaflet, centroid=None, reverseY=True,sigmas=None,sidechain=False,
+            colorscheme=None, drawchol=True, specialres=None, rotate2D=None) :
     """
     Plot the structure on a 2D grid
-    
+
     Parameters
     ----------
     axis : Axis object
@@ -854,17 +879,33 @@ class XrayDensity :
       colors to use if not pre-defined
     drawchol : boolean, optional
       if to draw cholesterols if they exists
+    specialres : list of int
+      residues to plot in black
     """
     if sigmas is None and self.sigmas is not None :
       sigmas = self.sigmas
 
+    if specialres is not None:
+      if colorscheme is None:
+        colorscheme = -np.ones([self.pdbfile.xyz.shape[0],3])
+      for res in specialres :
+        resid = self.template.residues.index(res)
+        for atom in self.pdbfile.residues[resid].atoms:
+          colorscheme[atom.idx,:] = [0.05,0.05,0.05]
+
     grid = GridTemplate(np.array([[0.0,0.0,0.0],self.box]),resolution=0.5)
-    centx = int(float(grid.size[0])/2.0)
-    centy = int(float(grid.size[1])/2.0)
+    centx = int(float(grid.size[0])/2.0)#+(35.0-centroid[0])*grid.resolution
+    centy = int(float(grid.size[1])/2.0)#+(35.0-centroid[1])*grid.resolution
+    #print centx*grid.resolution,centy*grid.resolution,centroid,-(35.0-centroid[1]),-(35.0-centroid[0])
+
+    coords = np.array(self.protxyz,copy=True)
+    if rotate2D is not None :
+      m = self.protxyz.mean(axis=0)[:2]
+      coords[:,:2] = rotate2D(coords[:,:2]-m)+m
 
     hpoints = np.zeros([len(self.helices),2])
     for i,h in enumerate(self.helices) :
-      hlxxyz = self.protxyz[h[0]:h[1]+1,:]
+      hlxxyz = coords[h[0]:h[1]+1,:]
       aid = np.arange(h[0],h[1]+1)
       if leaflet[0:3] == "upp" :
         sel = hlxxyz[:,2] >= self.box[2]/2
@@ -874,48 +915,58 @@ class XrayDensity :
         idx = grid.indices(hlxxyz[sel,:])
         hpoints[i,0] = (idx[0].mean()-centx)*grid.resolution
         hpoints[i,1] = ((-idx[1]).mean()+centy)*grid.resolution
-        
+
         hlxsig = sigmas[h[0]:h[1]+1]
         hlxflag = self.protflag[h[0]:h[1]+1]
         for ai,coord,sig,flag in zip(aid[sel],hlxxyz[sel,:],hlxsig[sel],hlxflag[sel]) :
           if flag == -1 and not sidechain : continue
           fac = -1
-          if reverseY : fac = 1     
-          thiscolor = colors.color(i) 
+          if reverseY : fac = 1
+          thiscolor = colors.color(i)
+          if i == 0 : thiscolor = colors.color(11)
           thisalpha = 0.8
           if colorscheme is not None :
-            if colorscheme[ai,0] > -1  :  
-              thiscolor = colorscheme[ai,:]                  
-              thisalpha = 1.0 
-          cir = plt.patches.Circle((fac*(-coord[1]+centy*grid.resolution),coord[0]-centx*grid.resolution),radius=sig,fc=thiscolor,ec=thiscolor,alpha=thisalpha)
-          axis.add_patch(cir) 
-          
+            if colorscheme[ai,0] > -1  :
+              thiscolor = colorscheme[ai,:]
+              thisalpha = 1.0
+          cir = plt.patches.Circle((fac*(-coord[1]+centy*grid.resolution),coord[0]-centx*grid.resolution),
+                radius=sig,fc=thiscolor,ec=colors.darker(thiscolor),alpha=thisalpha)
+          axis.add_patch(cir)
+
     # Add annotation for each helix
     for i,pnt in enumerate(hpoints) :
       fac = -1
-      if reverseY : fac = 1
-      axis.text(fac*pnt[1],pnt[0],"H%d"%(i+1),bbox=dict(facecolor='white',alpha=0.9),color=colors.color(i),fontsize=10)
+      if reverseY : fac = 1 #colors.color(i)
+      axis.text(fac*pnt[1],pnt[0],"%d"%(i+1),bbox=dict(facecolor='white',alpha=0.9),color='k',fontsize=10)
 
     # Write out cholesterols
-    if drawchol and leaflet[0:3] == self.cholleaf and self.cholxyz != None and self.cholxyz.shape[0] > 0 :
+    if drawchol and leaflet[0:3] == self.cholleaf and self.cholxyz is not None and self.cholxyz.shape[0] > 0 :
       fac = -1
       if reverseY : fac = 1
-      axis.plot(fac*(-self.cholxyz[::2,1]+centy*grid.resolution),self.cholxyz[::2,0]-centx*grid.resolution,'xk')
+      coords = np.array(self.cholxyz,copy=True)
+      if rotate2D is not None :
+        m = self.protxyz.mean(axis=0)[:2]
+        coords[:,:2] = rotate2D(coords[:,:2]-m)+m
+      axis.plot(fac*(-coords[::2,1]+centy*grid.resolution),coords[::2,0]-centx*grid.resolution,'xk',markeredgewidth=1.0)
 
-def draw_colormap(figure,image,text=r'$\ln[\rho/\rho_0]$') :
+def draw_colormap(figure,image, text=r'$-RT\ \ln(\rho/\rho_0)$', unittxt="$\mathrm{[kJ/mol]}$") :
   """
   Draw a colorbar associated with an image
   """
   cax = figure.add_axes([ 0.08,0.0, 1,1])
-  cax.text(1.03,0.77,text)
+  if unittxt != "":
+      cax.text(0.99,0.80, text)
+      cax.text(1.03,0.77, unittxt)
+  else:
+      cax.text(0.99,0.77,text)
   hide_axis(cax)
-  figure.colorbar(image,orientation='vertical',ax=cax,shrink=0.5,aspect=50) 
-  return cax 
+  figure.colorbar(image,orientation='vertical',ax=cax,shrink=0.5,aspect=50)
+  return cax
 
 def draw_joint2d(axis,residues0,residues,contacts,logit=False) :
   """
   Draw a residue-residue contact joint probability plot as a contour
-  
+
   Parameters
   ----------
   axis : Axis object
@@ -929,7 +980,7 @@ def draw_joint2d(axis,residues0,residues,contacts,logit=False) :
   logit : boolean, optional
     if to plot log probabilities
   """
-  
+
   sel = contacts>0
   if logit :
     logcont = np.zeros(contacts.shape)
@@ -940,7 +991,7 @@ def draw_joint2d(axis,residues0,residues,contacts,logit=False) :
   excluded_im = np.ones([contacts.shape[0],contacts.shape[1],4])
   excluded_im[sel,3] = 0.0
   axis.imshow(excluded_im,origin="lower")
-  
+
   sel = residues > 0
   axis.set_xticks(residues0[sel][::20])
   axis.set_yticks(residues0[sel][::20])
@@ -948,7 +999,7 @@ def draw_joint2d(axis,residues0,residues,contacts,logit=False) :
   axis.set_yticklabels(residues[sel][::20])
   axis.set_xlabel("Residue")
   axis.set_ylabel("Residue")
-  
+
   return C
 
 def hide_axis(axis) :
@@ -959,20 +1010,21 @@ def hide_axis(axis) :
   axis.get_yaxis().set_visible(False)
   axis.patch.set_alpha(0)
   axis.set_frame_on(False)
-  
-def plot_density_xray(axis,density,mat,minval,maxval,xray,leaflet,label,number=None,plotn=True,drawchol=True) :
+
+def plot_density_xray(axis,density,mat,minval,maxval,xray,leaflet,label,
+    number=None, plotn=True, drawchol=True, specialres=None) :
   """
   Utility function to plot both density and x-ray structure
-  
+
   Parameters
   ----------
   axis : Axis object
     the axis to plot on
-  density : Density 
+  density : Density
     the density to plot
   mat : string
     the matrix of the Density to plot
-  minval : float 
+  minval : float
     the minimum value of the image
   maxval : float
     the maximum value of the image
@@ -988,12 +1040,14 @@ def plot_density_xray(axis,density,mat,minval,maxval,xray,leaflet,label,number=N
     if to draw the average number of molecules on the density
   drawchol : boolean, optional
       if to draw cholesterols if they exists
-          
+  specialres : list of int
+    residues to plot in black
   Returns
   -------
   Image :
     the Image of the density that was plotted, for adding colormap
   """
+
   if density == 0 :
     density = Density(np.zeros([70,70]),2)
     density.append(np.zeros([70,70]))
@@ -1001,18 +1055,33 @@ def plot_density_xray(axis,density,mat,minval,maxval,xray,leaflet,label,number=N
     mat = "average"
     minval = -1000
     maxval = 1000
-    
-  if density is not None : 
-    im = density.plot(mat,axis,plt.cm.RdYlBu_r,minval,maxval=maxval,reverseY=leaflet=="upp")
+
+  def rotate_mat(m):
+    return np.rot90(m, 2)
+  rotate2D =  None # if leaflet=="low" else rotate_mat
+  c = density.centroid(rotate2D)
+
+  if density is not None :
+    im = density.plot(mat,axis,plt.cm.RdYlBu,minval,maxval=maxval ,reverseY=leaflet=="upp", rotate2D=rotate2D)
   else :
     im = None
 
-  xray.plot(axis,leaflet,reverseY=leaflet=="upp",drawchol=drawchol)
+  def rotate_coords(coords):
+    angle = np.pi
+    r = np.matrix( ((np.cos(angle),-np.sin(angle)), (np.sin(angle), np.cos(angle))) )
+    return np.asarray(coords*r)
+  rotate2D = None  #if leaflet=="low" else rotate_coords
+
+  xray.plot(axis,leaflet, c, reverseY=leaflet=="upp",drawchol=drawchol, specialres=specialres, rotate2D=rotate2D)
   axis.set_xlim((-35,35))
+  axis.set_xticks([-30,-20,-10,0,10,20,30])
+  axis.set_yticks([-30,-20,-10,0,10,20,30])
+  axis.set_xticklabels(["-3","-2","-1",0,"1","2","3"])
+  axis.set_yticklabels(["-3","-2","-1",0,"1","2","3"])
   axis.set_ylim((-35,35))
-  axis.text(-28,28,label,size=14)     
+  axis.text(-28,28,label,size=14)
   if number is not None : axis.text(-45,38,number)
-  if plotn : axis.text(-28,-32,"<n>=%.1f"%(density.molcount.mean()),size=12)  
+  if plotn : axis.text(-28,-32,"<n>=%.1f"%(density.molcount.mean()),size=12)
   return im
 
 ################
@@ -1029,7 +1098,7 @@ def load_template(mol) :
   else :
     raise Exception("Invalid mol (%s) or file is missing (%s)"%(mol,filename))
 
-def load_xray(mol,loadsigma=False) :
+def load_xray(mol, loadsigma=False, loadaa=False) :
   """
   Load an XrayDensity object from a standard location
   """
@@ -1041,22 +1110,49 @@ def load_xray(mol,loadsigma=False) :
     if loadsigma :
       sigmafile = os.path.join(PROT_INFO_PATH,"sigmas_%s"%mol)
       if not os.path.isfile(sigmafile) : sigmafile = None
-      
-    return XrayDensity(filename,template,sigmafile)
+
+    if loadaa :
+      filename2 = os.path.join(PROT_INFO_PATH,"xray_%s-aa.gro"%mol)
+      return XrayDensity(filename,template,sigmafile), pdb.PDBFile(filename2)
+    else:
+      return XrayDensity(filename,template,sigmafile)
   else :
     raise Exception("File is missing (%s)"%filename)
+
+def read_rescontacts(folder, mol, percentile=90, expand=0, returnprobs=False):
+  """
+  Reads residue contacts from file and return a percentile
+  """
+  residues = []
+  contactprob = []
+  with open(os.path.join(folder,"%s_chol_6A_com_1d.txt"%mol), "r") as f :
+    lines = f.readlines()
+  for line in lines:
+    res, p, d1, d2 = line.strip().split()
+    contactprob.append(float(p))
+    residues.append(int(res[3:]))
+    for i in range(expand):
+        residues.append(int(res[3:])-i)
+        residues.append(int(res[3:])+1)
+  residues = np.asarray(residues)
+  contactprob = np.asarray(contactprob)
+  sel = contactprob >= np.percentile(contactprob, percentile)
+  if returnprobs:
+    return residues[sel],contactprob[sel]
+  else:
+    return residues[sel]
 
 def logical_expr(expr,*args) :
   """
   Simple parser of logical expression, to apply logical operators (not, and, or) on
-  numpy arrays. 
-  
+  numpy arrays.
+
   Supported characters:
   1-9 : index into args list of numpy array, start from 1
   n : logical not operator
   a : logical and operator
   o : logical or operator
-  
+
   Does not support parenthesis!
   """
   trace = ""
@@ -1109,4 +1205,3 @@ def write_booleans(fileobj,list) :
   bstr = struct.pack("?"*len(list),*list)
   #bstr = "".join("%d"%b for b in list)
   fileobj.write("%s\n"%bstr)
-  
