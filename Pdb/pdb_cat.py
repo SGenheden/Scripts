@@ -20,8 +20,8 @@ if __name__ == "__main__":
     parser.add_argument('-o','--out',help="the output filename")
     args = parser.parse_args()
 
-    pdbfile = pdb.PDBFile(filename=args.file[0])
+    pdbfile = pdb.PDBFile(filename=args.file[0], renumber=False)
     for filename in args.file[1:]:
-        pdbfile2 = pdb.PDBFile(filename)
+        pdbfile2 = pdb.PDBFile(filename, renumber=False)
         pdbfile.extend_residues(pdbfile2.residues)
     pdbfile.write(args.out)

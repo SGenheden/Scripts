@@ -29,7 +29,7 @@ LABEL2UNIT = {"kJ/mol" : KJMOL, "kcal/mol" : KCALMOL}
 def make_bins(data,nbins,boundaries=None) :
   """
   Make bin edges for histogramming
-  
+
   Parameters
   ----------
   data : numpy array
@@ -39,7 +39,7 @@ def make_bins(data,nbins,boundaries=None) :
   boundaries : list of float, optional
     the minimum and maximum of the edges,
     if not supplied used the 99% confidence interval of the data (assuming normality)
-    
+
   Results
   -------
   numpy array
@@ -65,9 +65,9 @@ def make_bins(data,nbins,boundaries=None) :
 def make_histograms(data,bins,boundaries=None) :
   """
   Histogram set of data using the same edges
-  
+
   Mainly used by UmbrellaSim class, but could be useful in other circumstances
-  
+
   Parameters
   ----------
   data : numpy array
@@ -76,7 +76,7 @@ def make_histograms(data,bins,boundaries=None) :
     the number of bins to use or the edges of the histogram
   boundaries : list of float, optional
     the minimum and maximum of the edges
-    
+
   Returns
   -------
   list of numpy array
@@ -86,16 +86,16 @@ def make_histograms(data,bins,boundaries=None) :
   """
   if not np.iterable(bins) :
     bins = make_bins(data,bins,boundaries)
-  
+
   histograms = [np.histogram(d,bins)[0] for d in data]
   return histograms,bins
 
 def make_reweighted_histograms(data,weights,bins,boundaries=None) :
   """
   Weight-histogram set of data using the same edges
-  
+
   Mainly used by UmbrellaSim class, but could be useful in other circumstances
-  
+
   Parameters
   ----------
   data : numpy array
@@ -106,7 +106,7 @@ def make_reweighted_histograms(data,weights,bins,boundaries=None) :
     the number of bins to use or the edges of the histogram
   boundaries : list of float, optional
     the minimum and maximum of the edges
-    
+
   Returns
   -------
   list of numpy array
@@ -128,10 +128,10 @@ class _ResultsFile :
   """
   Parent class to encapsulate a results file from an umbrella/zconst
   sampling simulation
-  
+
   Internally, irrespectively of MD code, the units should
   be Angstroms for lengths and kcal/mol for energy
-  
+
   Attributes
   ----------
   center : float
@@ -152,7 +152,7 @@ class _ResultsFile :
     both = _ResultsFile(self.center,self.weight)
     both.samples = np.zeros(self.samples.shape[0]+other.samples.shape[0])
     both.samples[:self.samples.shape[0]] = self.samples
-    both.samples[self.samples.shape[0]:] = other.samples    
+    both.samples[self.samples.shape[0]:] = other.samples
     return both
   def __radd__(self,other) :
     both = _ResultsFile(other.center,other.weight)
@@ -167,7 +167,7 @@ class _ResultsFile :
   def skip(self,nskip,ispart=True) :
     """
     Removes/skip samples at the start of the simulation
-    
+
     Parameters
     ----------
     nskip : int
@@ -182,7 +182,7 @@ class _ResultsFile :
   def shorten(self,n,ispart=True) :
     """
     Removes samples at the end of the simulation
-    
+
     Parameters
     ----------
     n : int
@@ -197,12 +197,12 @@ class _ResultsFile :
   def block_it(self,nblocks) :
     """
     Sub-sample/block the samples
-    
+
     Parameters
     ----------
     nblocks : int
       the number of blocks
-    
+
     Returns
     -------
     list of _ResultsFile objects
@@ -227,12 +227,12 @@ class _ResultsFile :
     self.samples = random.randn(self.samples.shape[0])*std + mean
   def lower(self) :
     """
-    Returns the lower part of the 99% confidence interval    
+    Returns the lower part of the 99% confidence interval
     """
     return self.samples.mean()-2.58*self.samples.std()
   def upper(self) :
     """
-    Returns the upper part of the 99% confidence interval    
+    Returns the upper part of the 99% confidence interval
     """
     return self.samples.mean()+2.58*self.samples.std()
 
@@ -243,7 +243,7 @@ class GromacsResultsFile(_ResultsFile) :
   def read(self,filename,**kwargs) :
     """
     Read a pullx-file
-    
+
     Parameters
     ----------
     filename : string
@@ -272,7 +272,7 @@ class GromacsResultsFile(_ResultsFile) :
       self.samples =  np.array(data,dtype=float) / 10.0 * ECONV[KJMOL][KCALMOL] # Convert to kcal/mol/A
     else :
       self.samples = np.array(data,dtype=float)*10 # Convert to A
-      if colidx != 2 : 
+      if colidx != 2 :
         self.samples = -self.samples
       if self.center > 0 : self.samples = np.abs(self.samples)
 
@@ -283,7 +283,7 @@ class PlumedResultsFile(_ResultsFile) :
   def read(self,filename,**kwargs) :
     """
     Read a colvars-file
-    
+
     Parameters
     ----------
     filename : string
@@ -291,7 +291,7 @@ class PlumedResultsFile(_ResultsFile) :
     **kwargs :
       colidx : the column index to parse
     """
-      
+
     data = []
 
     if "colidx" in kwargs :
@@ -303,13 +303,13 @@ class PlumedResultsFile(_ResultsFile) :
     with open(filename,"r") as f :
       line = f.readline()
       while line :
-        if line[0] != "#" : 
+        if line[0] != "#" :
           data.append(line.strip().split()[colidx])
         line = f.readline()
     self.samples = np.array(data,dtype=float)*10 # Convert to A
-    if colidx != 1 : 
+    if colidx != 1 :
       self.samples = -self.samples
-    if self.center > 0 : self.samples = np.abs(self.samples)
+    if self.center > 0 and "expansion" not in kwargs : self.samples = np.abs(self.samples)
 
 class LammpsResultsFile(_ResultsFile) :
   """
@@ -318,7 +318,7 @@ class LammpsResultsFile(_ResultsFile) :
   def read(self,filename,**kwargs) :
     """
     Read a colvars-file
-    
+
     Parameters
     ----------
     filename : string
@@ -330,20 +330,20 @@ class LammpsResultsFile(_ResultsFile) :
       stride = kwargs["stride"]
     else :
       stride = -1
-      
+
     data = []
     nread = 0
     with open(filename,"r") as f :
       line = f.readline()
       while line :
-        if line[0] != "#" : 
+        if line[0] != "#" :
           nread = nread + 1
           if stride <= 0 or (stride > 0 and (nread == 1 or (nread-1) % stride == 0)) :
             if len(line.strip().split()) > 1 :
               data.append(line.strip().split()[1])
         line = f.readline()
     self.samples = np.array(data,dtype=float)
-    
+
 class SimpleEnergyFile(_ResultsFile) :
   """
   Read a simple energy file with total energies
@@ -352,7 +352,7 @@ class SimpleEnergyFile(_ResultsFile) :
     """
     Read a two-columned energy file, where the second column is parsed
     as total energies
-    
+
     Parameters
     ----------
     filename : string
@@ -373,7 +373,7 @@ class UmbrellaSimulations() :
   """
   Class to encapsulate setup and results of a set of umbrella sampling simulations
   that can be combined with WHAM or Z-constraint method
-  
+
   Attributes
   ----------
   temperature : float
@@ -390,7 +390,7 @@ class UmbrellaSimulations() :
   weights : list of float
     the weights of the windows
   samples : list of numpy array
-    the samples of the simulations 
+    the samples of the simulations
   energies : list of numpy array
     the total energies of the simulation
   histograms : list of numpy array
@@ -412,7 +412,7 @@ class UmbrellaSimulations() :
   def add(self,results,energies=None) :
     """
     Add a simulation to the set
-    
+
     Parameters
     ----------
     results : _ResultsFile object
@@ -422,15 +422,15 @@ class UmbrellaSimulations() :
     """
     self.samples.append(results.samples)
     self.centers.append(results.center)
-    self.weights.append(results.weight)    
+    self.weights.append(results.weight)
     if energies != None : self.energies.append(energies)
   def make_histograms(self,nbins,boundaries=None,weighted=True) :
     """
     Histogram the data
-    
+
     If total energies are available and weighted is True, the Boltzmann
     weights of the total energies are used to weight the histogram
-    
+
     Parameters
     ----------
     nbins : int
@@ -448,7 +448,7 @@ class UmbrellaSimulations() :
   def make_bins(self,nbins,boundaries=None) :
     """
     Create bin edges for the data
-    
+
     Parameters
     ----------
     nbins : int
@@ -461,44 +461,44 @@ class UmbrellaSimulations() :
   def pairwise_overlap(self) :
     """
     Calculates the pairwise overlap of the histograms
-    
+
     If the histogram have not been made, nothing is done
-    
+
     Returns
     -------
     numpy array
       the pairwise overlap
     """
     if self.histograms is None : return
-    
+
     overlap = np.zeros(len(self.histograms)-1)
     pairwise_o = [np.sqrt(h1*h2) for h1,h2 in zip(self.histograms[:-1],self.histograms[1:])]
     pairwise_n    = [np.sqrt(s1.shape[0]*s2.shape[0]) for s1,s2 in zip(self.samples[:-1],self.samples[1:])]
-    
+
     for i,(o,n) in enumerate(zip(pairwise_o,pairwise_n)) :
       overlap[i] = np.sum(o)/float(n)*100
-      
-    return overlap 
+
+    return overlap
   def plot_histograms(self,xlabel="z-distance",filename=None) :
     """
     Plot all histograms
-    
+
     If the histogram have not been made, nothing is done
-    
+
     Parameters
     ----------
     xlabel : string
       the label of the x-axis
     filename : string, optional
       if given, the figure is save as a PNG to this name
-      
+
     Returns
     -------
     Figure object
       the figure created
     """
     if self.histograms is None or self.bins is None : return None
-    
+
     hfig = plt.figure()
     z = (self.bins[:-1]+self.bins[1:])/2.0
     for s,h in zip(self.samples,self.histograms) :
@@ -506,12 +506,12 @@ class UmbrellaSimulations() :
     hfig.gca().set_xlim([z[0],z[-1]])
     hfig.gca().set_xlabel(xlabel)
     if filename is not None : hfig.savefig(filename)
-    
+
     return hfig
 
 
 ##
-# This is some code that was a test but never worked, shouldn't be used  
+# This is some code that was a test but never worked, shouldn't be used
 #  def reweight_pmf(self,F) :
 ##    def bias(coor) :
 #      dx = centers - coor
@@ -538,15 +538,15 @@ class UmbrellaSimulations() :
 #        num =  nsamples[j]
 #        prob0[i] = prob0[i]+num/norm
 #    free = -self.kT*np.log(prob0)
-#    free = free - free[0] 
+#    free = free - free[0]
 #    print self.whamobj.free-self.whamobj.free[0]
 #    return free
-     
+
 
 class UmbrellaPmf :
   """
   Class to encapsulate an average PMF from umbrella simulations
-  
+
   Attributes
   ----------
   simulations : list of UmbrellaSimulations
@@ -580,10 +580,10 @@ class UmbrellaPmf :
   def change_unit(self,unit) :
     """
     Change unit of the PMFs
-    
+
     Parameters
     ----------
-    unit : int 
+    unit : int
       should be either KCALMOL or KJMOL
     """
     if unit == self.unit : return
@@ -598,27 +598,27 @@ class UmbrellaPmf :
     self.z = pmfs_and_z[0][0]
     self.pmfs = [pz[1] for pz in pmfs_and_z]
     self.pmfs = np.array(self.pmfs).transpose()
-    
+
     # Remove undefined z-values a set zero-pint
     idx = np.all(np.isfinite(self.pmfs),axis=1)
     self.z = self.z[idx]
     self.pmfs = self.pmfs[idx,:]
     if not "no_offset" in kwargs :
       self.pmfs = self.pmfs - self.pmfs[-1,:]
-    
+
     self.unit = simulations[0].unit
     self.kT = simulations[0].kT
-    
+
     self.average()
   def read(self,filename) :
     """
     Read the PMF from disc
-    
+
     Parameters
     ----------
     filename : string
-      the name of the file 
-    """  
+      the name of the file
+    """
     av = []
     std = []
     z = []
@@ -627,7 +627,7 @@ class UmbrellaPmf :
       label = header[header.index("(")+1:header.index(")")]
       self.unit = LABEL2UNIT[label]
       self.kT = KB[self.unit]*300
-      
+
       line = f.readline()
       while line :
         zval,avval,stdval = line.strip().split()
@@ -638,15 +638,15 @@ class UmbrellaPmf :
     self.z = np.array(z,float)
     self.av = np.array(av,float)
     self.std = np.array(std,float)
-     
+
   def write(self,filename) :
     """
     Write the PMF to disc
-    
+
     Parameters
     ----------
     filename : string
-      the name of the file 
+      the name of the file
     """
     with open(filename,"w") as f :
       f.write("#z-distance PMF Uncert. (%s)\n"%ELABEL[self.unit])
@@ -656,14 +656,14 @@ class UmbrellaPmf :
   def plot(self,fig=None,label="",ylabel=None,xlabel="z-distance [A]",filename=None,stride=10,color=None) :
     """
     Plot the average PMF
-    
+
     Parameters
     ----------
     xlabel : string
       the label of the x-axis
     filename : string, optional
       if given, the figure is save as a PNG to this name
-      
+
     Returns
     -------
     Figure object
@@ -713,7 +713,7 @@ class UmbrellaPmf :
       if i == len(x) - 1 :
         w = 1.0 - 0.5*(x[i]+x[i-1])
       else :
-        w = 0.5*(x[i+1]-x[i-1])      
+        w = 0.5*(x[i+1]-x[i-1])
       std = std + w**2*stds[i]**2
     return intsum,np.sqrt(std)
 
@@ -722,7 +722,7 @@ class UmbrellaPmf :
     Returns the standard binding free energy and its standard error
     """
     # JCTC, 2011, 7, 4175-4188
-    
+
     expav = np.exp(-self.av/self.kT)
     expstd = np.abs(expav*(-self.std/self.kT))
     bndint,bndstd = self._trapz(self.z,expav,expstd)
@@ -740,7 +740,7 @@ class UmbrellaPmf :
     f = interp1d(water_density[:,0],water_density[:,1],kind="cubic")
     rho = f(self.z)
     rho = rho/rho.max()
-    expav = np.exp(-self.av/self.kT) - rho    
+    expav = np.exp(-self.av/self.kT) - rho
     expstd = np.abs(expav*(-self.std/self.kT))
     bndint,bndstd = self._trapz(self.z,expav,expstd)
     if bndint < 0 :
@@ -753,10 +753,10 @@ class UmbrellaPmf :
 #    f.gca().plot(self.z,rho,'--')
 #    f.gca().plot(self.z,f2(self.z),'-*')
 #    f.savefig("partition.png",format="png")
-    return bndint,bndstd    
+    return bndint,bndstd
 
 ###################################
-# Classes that implements the WHAM 
+# Classes that implements the WHAM
 ###################################
 
 class _PmfGenerator(object) :
@@ -781,7 +781,7 @@ class _PmfGenerator(object) :
   samples : list of numpy array
     the samples of the simulations
   energies : list of numpy array
-    the total energies of the simulation      
+    the total energies of the simulation
   """
   def __init__(self,simulations) :
     self.simulations = simulations
@@ -804,9 +804,9 @@ class _PmfGenerator(object) :
 class Diffusion(_PmfGenerator) :
   """
   Class to estimate the diffusion by the Woolf and Roux method
-  """  
+  """
   def __init__(self,simulations) :
-    super(Diffusion,self).__init__(simulations)    
+    super(Diffusion,self).__init__(simulations)
   def pmf(self,**kwargs) :
     diff = np.zeros(len(self.samples))
     dt = (kwargs["dt"] if "dt" in kwargs else 1)
@@ -826,12 +826,12 @@ class Diffusion(_PmfGenerator) :
       return a0*np.exp(-x/t0)
     x = np.arange(z.shape[0])
     try :
-      popt,pcov = opt.curve_fit(double_exp,x,acf,p0=[10,10,0.1,0.1])     
+      popt,pcov = opt.curve_fit(double_exp,x,acf,p0=[10,10,0.1,0.1])
       acf_opt = double_exp(x,*popt)
     except :
-      popt,pcov = opt.curve_fit(single_exp,x,acf,p0=[10,0.1])     
+      popt,pcov = opt.curve_fit(single_exp,x,acf,p0=[10,0.1])
       acf_opt = single_exp(x,*popt)
-    t = np.trapz(acf_opt)*dt      
+    t = np.trapz(acf_opt)*dt
     return np.abs(t)
 
 class ZConst(_PmfGenerator) :
@@ -846,7 +846,7 @@ class ZConst(_PmfGenerator) :
     the diffusion coeffcient along the reaction coordinate
   """
   def __init__(self,simulations) :
-    super(ZConst,self).__init__(simulations)    
+    super(ZConst,self).__init__(simulations)
     self._pmf = None
     self._diffusion = None
   def pmf(self,**kwargs) :
@@ -858,14 +858,14 @@ class ZConst(_PmfGenerator) :
     **kwargs : dictionary of options
       compute : string
         what to compute, recognizes pmf and resistance
-  
+
     Returns
     -------
     NumpyArray :
       the reaction coordinate
     NumpyArray :
       the free energy, PMF
-    """  
+    """
     self.compute_pmf()
     if "compute" not in kwargs or "compute" in kwargs and kwargs["compute"] == "pmf" :
       return self.centers,self._pmf
@@ -878,7 +878,7 @@ class ZConst(_PmfGenerator) :
     print len(self.samples)
     print avf,self.samples[0][0]
     print self.centers
-    avf = np.array(avf[::-1]) 
+    avf = np.array(avf[::-1])
     zrev = self.centers[::-1]
     pmf = np.zeros(avf.shape)
     for i,av in enumerate(avf) :
@@ -891,11 +891,11 @@ class ZConst(_PmfGenerator) :
       df = s-s.mean()
       x = np.fft.fft(df)
       acf = np.real(np.fft.ifft(s*np.conjugate(s)))
-      
+
 class Wham(_PmfGenerator) :
   """
   Class to encapsulate the Weighted Histogram Analysis Method for a 1D reaction coordinate
-  
+
   Attributes
   ----------
   histograms : list of numpy array
@@ -904,7 +904,7 @@ class Wham(_PmfGenerator) :
     the bin edges of the histogram
   F : numpy array
     the bias free energies
-  prob : numpy array 
+  prob : numpy array
     the unbiased probability distribution
   free : numpy array
     the unbiased free energy distribution
@@ -918,16 +918,16 @@ class Wham(_PmfGenerator) :
     self.free =   None
 
   def iterate(self,tolerance=1E-5,maxiter=100000,verbose=True) :
-    """ 
-    Converge the bias free energies until self-consistency 
-    
+    """
+    Converge the bias free energies until self-consistency
+
     This is a virtual method that should be implemented by sub-classes
-    
+
     Parameters
     ----------
     tolerance : float
       the maximum relative difference in the bias free energies
-    maxiter : int 
+    maxiter : int
       stops after this many iterations, irrespectively of convergence
     verbose : bool, optional
       indicates if convergence information should be printed out
@@ -941,7 +941,7 @@ class Wham(_PmfGenerator) :
     ----------
     **kwargs : dictionary of options
       not currently used
-  
+
     Returns
     -------
     NumpyArray :
@@ -951,44 +951,44 @@ class Wham(_PmfGenerator) :
     """
     self.iterate(verbose=False)
     z = (self.bins[0:-1]+self.bins[1:])/2.0
-    return z,self.free    
+    return z,self.free
 
 class ExternalWham(Wham) :
-  """ 
-  Converge the bias free energies until self-consistency 
+  """
+  Converge the bias free energies until self-consistency
   do this by calling an external program which is faster
   than the pure Python implementation
-  
+
   Uses the wham program from the Grossfield lab
-  
+
   The wham program should be referenced by the environmental variable $WHAM
   """
   def iterate(self,tolerance=1E-5,maxiter=100000,verbose=True) :
 
-    
+
     tempfolder = tempfile.mkdtemp(dir=os.getcwd())
 
     self._hasenergies = len(self.energies) == len(self.samples)
     self._write_datafiles(tempfolder)
     metafile = self._write_metafile(tempfolder)
-   
-    if self.bins is None : 
+
+    if self.bins is None :
       self.simulations.make_bins()
-      self.bins = self.simulations.bins   
- 
+      self.bins = self.simulations.bins
+
     whamprog = os.getenv("WHAM","/home/sg6e12/Programs/wham/wham/wham")
     freefile = "%s/wham_free"%tempfolder
     logfile  = "%s/wham_log"%tempfolder
-   
+
     whamcommand = "%s %.4f %.4f %d %.0E %.2f 0 %s %s >& %s"%(whamprog,self.bins[0],self.bins[-1],self.bins.shape[0]-1,tolerance,self.temperature,metafile,freefile,logfile)
-    subprocess.call(whamcommand,shell=True)  
-    
+    subprocess.call(whamcommand,shell=True)
+
     self._extract_output(freefile)
 
     shutil.rmtree(tempfolder)
 
   def _write_datafiles(self,tempfolder) :
-    """ Write out all data to files in the tempfolder 
+    """ Write out all data to files in the tempfolder
     """
     for i,sample in enumerate(self.samples) :
       with open("%s/traj%d"%(tempfolder,i),"w") as f :
@@ -997,7 +997,7 @@ class ExternalWham(Wham) :
           if self._hasenergies : f.write(" %.8f"%(self.energies[i][j]))
           f.write("\n")
   def _write_metafile(self,tempfolder) :
-    """ Write out a WHAM metadata file 
+    """ Write out a WHAM metadata file
     """
     filename = "%s/wham_meta"%tempfolder
     with open(filename,"w") as f :
@@ -1007,7 +1007,7 @@ class ExternalWham(Wham) :
         f.write("\n")
     return filename
   def _extract_output(self,filename) :
-    """ Extract results from WHAM 
+    """ Extract results from WHAM
     """
     self.F = np.zeros(len(self.samples))
     self.prob = np.zeros(self.bins.shape[0]-1)
@@ -1018,16 +1018,16 @@ class ExternalWham(Wham) :
       for i in range(self.bins.shape[0]-1) :
         cols = f.readline().strip().split()
         self.prob[i] = float(cols[3])
-        self.free[i] = float(cols[1])    
+        self.free[i] = float(cols[1])
       # Look for the window free energies and extract them
       line = f.readline()
       for i in range(self.F.shape[0]) :
         cols = f.readline().strip().split()
-        self.F[i] = float(cols[1])    
+        self.F[i] = float(cols[1])
 
 class PyWham(Wham) :
   """
-  Pure Python implementation of the WHAM algorithm, 
+  Pure Python implementation of the WHAM algorithm,
   relatively slow but reproduces the wham program from the Grossfield lab
   """
   def iterate(self,tolerance=1E-5,maxiter=100000,verbose=True) :
@@ -1042,8 +1042,8 @@ class PyWham(Wham) :
     self.prob = np.zeros(self.nbins)
     self.niter = 0
     while self.niter == 0 or not self.__converged(tolerance) :
-      self.niter +=1 
-      if verbose and self.niter % 1 == 0 : 
+      self.niter +=1
+      if verbose and self.niter % 1 == 0 :
         print "Maximum error at iteration %d is %10E"%(self.niter,self.__maxerr())
         print "\t F: %s"%", ".join(["%.5f"%f for f in self.F])
       self.__Fold = np.array(self.F,copy=True)
@@ -1056,7 +1056,7 @@ class PyWham(Wham) :
     self.prob = self.prob / self.prob.sum()
     # Calculate the free energy and normalize with respect to 0
     self.free = -self.kT*np.log(self.prob)
-    self.free = self.free - self.free[0] 
+    self.free = self.free - self.free[0]
   def __calc_bias(self,coor) :
     """ Calculate harmonic bias potential
     """
@@ -1068,32 +1068,32 @@ class PyWham(Wham) :
     """
     error = np.abs(self.F-self.__Fold)
     return error.max() <= tolerance
-  def __maxerr(self) : 
+  def __maxerr(self) :
     """ Calculate the maximum error
     """
     error = np.abs(self.F-self.__Fold)
     return error.max()
   def __oneiter(self) :
     """ Perform one Wham iteration
-    """   
+    """
     # Loop over all edges of the histograms
     for i,coor in enumerate(self.bins) :
-      # Use the previously calculated bias free energies (self.F) 
+      # Use the previously calculated bias free energies (self.F)
       # to estimate the probability distribution
       num = 0.0
       denom = np.exp((self.__Fold-self.__calc_bias(coor))/self.kT)*self.nsamples
-      for hi,histo in enumerate(self.histograms) : 
+      for hi,histo in enumerate(self.histograms) :
         num = num + histo[i]
       self.prob[i] = num / denom.sum()
       # Update the bias free energies using the estimated probability distribution
       self.F = self.F + np.exp(-self.__calc_bias(coor)/self.kT)*self.prob[i]
-    # Take the logarithm and remove an arbitrary constant 
+    # Take the logarithm and remove an arbitrary constant
     self.F = -self.kT*np.log(self.F)
     self.F = self.F-self.F[-1]
 
 
 # For debugging
-if __name__ == '__main__' :   
+if __name__ == '__main__' :
 
   import sys
   results = GromacsResultsFile(1.0,0.0,filename=sys.argv[1],isforces=True)
@@ -1122,4 +1122,3 @@ if __name__ == '__main__' :
   a.plot(acf[:10])
   f.savefig("temp.png",format="png")
   print (KB[KJMOL]*300)**2*np.trapz(y)
-  

@@ -8,6 +8,18 @@ import math
 
 import numpy as np
 
+def sphere_surf_rand():
+
+  u1 = 100
+  u2 = 1000
+  while u1*u1 + u2*u2 >= 1 :
+    u1 = np.random.uniform(low=-1,high=1)
+    u2 = np.random.uniform(low=-1,high=1)
+  x = 2*u1*np.sqrt(1-u1*u1-u2*u2)
+  y = 2*u2*np.sqrt(1-u1*u1-u2*u2)
+  z = 1 - 2*(u1*u1 + u2*u2)
+  return np.asarray([x,y,z])
+
 def sphere_rand(r) :
   """
   Random number on sphere with radius r
@@ -164,6 +176,16 @@ def multi2RB(forces,multiplicities,phases) :
 
   return C
 
+
+def sphericity(xyz) :
+
+    xyz2 = xyz - xyz.mean(axis=0)
+    tensor = np.zeros((3, 3))
+    for x in range(xyz2.shape[0]):
+        tensor += np.outer(xyz2[x, :], xyz2[x, :])
+    eigval = np.linalg.eigvalsh(tensor)
+    shape = (3.0 / 2.0) * 3 * np.var(eigval) / np.sum(eigval)**2
+    return eigval, shape
 
 def centerOfMass(xyz,masses) :
   """

@@ -33,6 +33,10 @@ def color(idx) :
   colors.append((131.0/255.0,202.0/255.0,255.0/255.0))
   colors.append((49.0/255.0,64.0/255.0,4.0/255.0))
   colors.append((174.0/255.0,207.0/255.0,0.0/255.0))
+  colors.append((74.0/255.0,35.0/255.0,109.0/255.0))
+  colors.append((253.0/255.0,148.0/255.0,43.0/255.0))
+  colors.append((197.0/255.0,0.0/255.0,12.0/255.0))
+  colors.append((1.0/255.0,132.0/255.0,209.0/255.0))  
   d = int(len(colors)*np.floor(idx / float(len(colors))))
   return colors[idx-d]
 

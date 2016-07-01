@@ -4,6 +4,7 @@
 Classes to perform actions on MD trajectories
 """
 
+import os
 from collections import namedtuple
 
 import MDAnalysis as md
@@ -18,6 +19,7 @@ except:
 
 from . import pbc
 from . import geo
+from . import groups
 
 MDRecord = namedtuple("MDRecord",["time","value"])
 
@@ -170,7 +172,7 @@ class CenterWholeAlign(TrajectoryAction):
 
         self.records = []
         self.writer = md.Writer(args.out,
-                                    self.processor.universe.trajectory.numatoms)
+                                    self.processor.universe.trajectory.n_atoms)
         self.out = args.out
         self.bbmask = args.bbmask
 
@@ -201,7 +203,7 @@ class CenterWholeAlign(TrajectoryAction):
     def _center(self) :
         xyz = self.processor.currsnap._pos
         #com1 = xyz[self.protsel[0].number:self.protsel[-1].number+1].mean(axis=0)
-        com1 = self.protsel.centerOfGeometry()
+        com1 = self.protsel.center_of_geometry()
 
         for residue in self.residue_atoms :
             com2 = xyz[residue.first:residue.last+1].mean(axis=0)
@@ -210,6 +212,8 @@ class CenterWholeAlign(TrajectoryAction):
 
         delta = com1 - self.processor.currbox/2.0
         self.processor.currsnap._pos = xyz - delta
+
+MDGroupSelection = namedtuple("MDGroupSelection",["atomgroup", "indices", "transmat"])
 
 class ChainOrderAnalysis(TrajectoryAction):
     """
@@ -228,15 +232,102 @@ class ChainOrderAnalysis(TrajectoryAction):
     """
     def add_arguments(self, parser):
         parser.add_argument('--selections',nargs="+", help="the chains")
-        parser.add_argument('-o', '--out', help="the output prefix", default="order.txt")
+        parser.add_argument('--analysis',choices=["CC","CH"], help="the type of analysis C-C or C-H", default="CC")
+        parser.add_argument('--groups', help="group definitions for pseudo-atom calculation")
+        parser.add_argument('-o', '--out', help="the output prefix", default="order")
 
     def setup(self, args):
+
+        def _get_h(atomgrp):
+            for atom2 in atomgrp[0].bonded_atoms :
+                if atom2.mass < 2.0 :
+                    return self.processor.universe.select_atoms("resname %s and name %s"%(atomgrp[0].resname,atom2.name))
+            raise Exception("Could not find any H atom bonded to %s in %s"%(atomgrp[0].name,atomgrp[0].resname))
+
+        def _expandlist(liststr):
+
+            l, r = liststr.split("..")
+
+            i = l.find("(")
+            start = int(l[i+1:])
+            l = l[:i]
+
+            i = r.find(")")
+            end = int(r[:i])
+            r = r[i+1:]
+
+            return ["%s%d%s"%(l,i,r) for i in range(start,end+1)]
+
+        self.headers = ["Time"]
+        self.selheaders = []
         self.selections = []
+        self.analtype = args.analysis
+        if self.analtype == "CH" :
+            self.hselections = []
+
+        self.resgroups = None
+        if args.groups is not None:
+            if self.analtype == "CH" :
+                raise Exception("Cannot perform C-H analysis on pseudo-atoms")
+            self.resgroups = groups.read_groups(args.groups)
+
         for selin in args.selections:
             resname, chainlist = selin.split(":")
-            atomsels = [self.processor.universe.select_atoms("resname %s and name %s"%(resname,atom))
-                    for atom in chainlist.split("-")]
-            self.selections.append(atomsels)
+
+            if self.resgroups is not None:
+                if resname not in self.resgroups:
+                    raise Exception("Cannot find %s in groups spec."%resname)
+                pseudoatoms = [group.name for group in self.resgroups[resname].groups]
+
+            if chainlist.find("-") > -1:
+                atomlist = chainlist.split("-")
+            elif chainlist.find("..") > -1:
+                atomlist = _expandlist(chainlist)
+            else:
+                raise Exception("Atom list need be specified with '-' or with expansion '(..)'")
+
+            if self.resgroups is None:
+                atomsels = [self.processor.universe.select_atoms("resname %s and name %s"%(resname,atom))
+                        for atom in atomlist]
+                print "%s (%s) - %d atoms and %d atoms in first selection"% \
+                    (resname, ",".join(atomlist), len(atomlist), len(atomsels[0]))
+                for atomgrp, atom in zip(atomsels[1:], atomlist[1:]):
+                    if len(atomgrp) != len(atomsels[0]):
+                        raise Exception("Selection for %s is different in length than the first selection"%atom)
+                self.selections.append(atomsels)
+            else:
+                for atom in atomlist:
+                    if atom not in pseudoatoms :
+                        raise Exception("Could not find selected atom %s in the group spec."%atom)
+                # Select all atoms for the selected residue, the coordinates
+                # will be transformed to pseudo-atoms
+                atomsel = self.processor.universe.select_atoms("resname %s"%resname)
+                atomnames = [atom.name for atom in atomsel.residues[0].atoms]
+                ngroups = len(self.resgroups[resname].groups)
+                natoms = len(atomnames)
+                nres = len(atomsel.residues)
+                # Create the pseudo atom indices
+                indices0 = [self.resgroups[resname].indices(atom) for atom in atomlist]
+                indices = [[i0[0]+ngroups*i for i in range(nres)] for i0 in indices0]
+                # Create the transformation matrix by replacting the one for the first residue
+                transmat0 = self.resgroups[resname].transmat(atomnames)
+                transmat = np.zeros([ngroups*nres,natoms*nres])
+                for i in range(nres):
+                    transmat[i*ngroups:(i+1)*ngroups,i*natoms:(i+1)*natoms] = transmat0
+                self.selections.append(MDGroupSelection(atomsel, indices, transmat))
+                print "%s (%s) - %d atoms and %d atoms in first selection"% \
+                    (resname, ",".join(atomlist), len(atomlist), len(indices[0]))
+
+            self.headers.extend(["%s/%s"%(resname, atom) for atom in atomlist])
+            self.selheaders.append(["%s/%s"%(resname, atom) for atom in atomlist])
+
+            if self.analtype == "CH":
+                hatomsels = [_get_h(atomgrp) for atomgrp in atomsels]
+                self.hselections.append(hatomsels)
+                for atomgrp, atom in zip(hatomsels[1:], atomlist[1:]):
+                    if len(atomgrp) != len(hatomsels[0]):
+                        raise Exception("H-selection for %s is different in length than the first selection"%atom)
+
         self.out = args.out
         # Assumes that the normal is along the z-axis
         self.normal = np.array([0.0,0.0,1.0])
@@ -245,21 +336,69 @@ class ChainOrderAnalysis(TrajectoryAction):
     def process(self):
 
         orders = []
-        for selection in self.selections :
-            for a1, a2 in zip(selection[:-1],selection[1:]):
-                orders.append(self._calc_order(a1 , a2, self.normal))
+        if self.analtype == "CC":
+            if self.resgroups is None:
+                for selection in self.selections :
+                    for a1, a2 in zip(selection[:-1],selection[1:]):
+                        orders.append(self._calc_order(a1.get_positions(),
+                                        a2.get_positions(), self.normal))
+            else:
+                if self.processor.nprocessed == 1:
+                    f = open(self.out+"_first_pseudo.xyz", "w")
+                for selection in self.selections :
+                    xyz = np.dot(selection.transmat, selection.atomgroup.get_positions())
+                    if self.processor.nprocessed == 1:
+                        for pos in xyz:
+                            f.write("c %.3f %.3f %.3f\n"%(pos[0], pos[1], pos[2]))
+                    for i1, i2 in zip(selection.indices[:-1], selection.indices[1:]):
+                        orders.append(self._calc_order(xyz[i1,:],
+                                        xyz[i2,:], self.normal))
+                if self.processor.nprocessed == 1:
+                    f.close()
+        elif self.analtype == "CH":
+            for cselection, hselection in zip(self.selections, self.hselections):
+                for a1, a2 in zip(cselection, hselection):
+                    orders.append(self._calc_order(a1.get_positions(),
+                                    a2.get_positions(), self.normal))
         self.records.append(MDRecord(self.processor.currtime, orders))
 
     def _calc_order(self,a1,a2,norm):
         # Atom2 - Atom1
-        vec = a2.get_positions() - a1.get_positions()
+        vec = a2 - a1
         # Projection with normal
         proj = np.multiply(vec,norm).sum(axis=1)**2 / np.sum(vec**2,axis=1)
         # Order param
         return np.abs(0.5*(3.0*proj.mean()-1))
 
     def finalize(self):
-        self._write_records()
+        self._write_records(postfix="_dt.txt", headers=self.headers)
+
+        data = np.asarray([r.value for r in self.records])
+        av = data.mean(axis=0)
+        std = data.std(axis=0)
+        offset = 0
+        selavs = []
+        selstds = []
+        fac = -1 if self.analtype == "CC"  else 0
+        for heads in self.selheaders:
+            selavs.append(av[offset:offset+len(heads)+fac])
+            selstds.append(std[offset:offset+len(heads)+fac])
+            offset += len(heads)+fac
+        maxatm = max([len(heads) for heads in self.selheaders])+fac
+
+        with open(self.out+".txt", "w") as f :
+            f.write("".join(["\t%s\t\t"%heads[0].split("/")[0] for heads in self.selheaders])+"\n")
+            for i in range(maxatm):
+                for j in range(len(self.selheaders)):
+                    if i < len(self.selheaders[j]) :
+                        f.write("%s\t%.3f\t%.3f\t"%(self.selheaders[j][i].split("/")[1],
+                            selavs[j][i],selstds[j][i]))
+                    else:
+                        f.write(" \t \t \t")
+                f.write("\n")
+            for avs in selavs:
+                f.write("Av\t%.3f\t%.3f\t"%(avs.mean(),avs.std()/np.sqrt(avs.shape[0])))
+            f.write("\n")
 
 class IredAnalysis(TrajectoryAction):
     """
@@ -390,8 +529,9 @@ class MempropAnalysis(TrajectoryAction):
         watsel  = self.processor.universe.select_atoms(args.watmask)
         self.nlipid = len(self.lipidsel.residues)
         self.nwat = len(watsel.residues)
-        self.watvol = args.watvol
         nphosph = len(self.phosphorsel.residues)
+        print "Number of lipids (%d), waters (%d) and phosphor atoms (%d)"%(self.nlipid,self.nwat,nphosph)
+        self.watvol = args.watvol
         if self.nlipid == 0 or self.nwat == 0 or nphosph == 0 :
             raise Exception("Either number of lipids (%d), water (%d) or phosphor atoms (%d)  is zero"%(self.nlipid,self.nwat,nphosph))
         self.apllist = []
@@ -457,7 +597,7 @@ class MemVoronoiAnalysis(TrajectoryAction) :
 
     def setup(self, args):
         self.atoms = self.processor.universe.select_atoms(
-            " or ".join("name %s"%m for m in args.mask))
+            " or ".join("(%s)"%m for m in args.mask))
         self.head = self.processor.universe.select_atoms("name %s"%args.head)
         self.out = args.out
         self.aplrecords = []
@@ -586,7 +726,8 @@ class PrincipalAxisAnalysis(TrajectoryAction):
 class RmsdAnalysis(TrajectoryAction) :
 
     def add_arguments(self, parser):
-        parser.add_argument('--sel',help="the selectiom mask for the atoms to superpose",default="protein and (name C or name CA or name N)")
+        parser.add_argument('--sel',help="the selectiom mask for the atoms to superpose",default="protein and (name C or name CA or name N or name O)")
+        parser.add_argument('--mobile',help="the selectiom mask for the mobile atoms")
         parser.add_argument('-o','--out',help="the output",default="rmsd.out")
 
     def setup(self, args):
@@ -596,14 +737,31 @@ class RmsdAnalysis(TrajectoryAction) :
             self.processor.universe.select_atoms(args.sel))
         self.out = args.out
         self.records = []
+        if args.mobile is not None:
+            self.refsel = self.refuni.select_atoms(args.mobile)
+            self.trjsel = self.processor.universe.select_atoms(args.mobile)
+            print "Mobile RMSD is on %d atoms"%len(self.refsel)
+            self.mobrecords = []
+            self.domobile = True
+        else:
+            self.domobile = False
 
     def process(self):
         rmsd = align.alignto(self.processor.universe, self.refuni,
                             select=self.sel)[1]
         self.records.append(MDRecord(self.processor.currtime,rmsd*0.1))
 
+        if self.domobile :
+            rmsd =  np.sqrt(np.mean((self.refsel.positions - self.trjsel.positions) ** 2))
+            self.mobrecords.append(MDRecord(self.processor.currtime,rmsd*0.1))
+
     def finalize(self):
         self._write_records()
+        if self.domobile:
+            self.records = self.mobrecords
+            r, t = os.path.splitext(self.out)
+            self.out = r
+            self._write_records(postfix="_mob"+t)
 
 class RMSFAnalysis(TrajectoryAction):
     """
@@ -673,6 +831,80 @@ class RMSFAnalysis(TrajectoryAction):
                     for atom in residue:
                         if atom.name not in atomnames : continue
                         f.write("%s %d %.3f\n"%(atom.resname,atom.resnum+self.resoffset,bfac[atom.number]))
+
+class SoluteGyration(TrajectoryAction):
+    """
+    Class to analyse radius of gyration for a solute
+
+    Attributes
+    ----------
+    records : list of MDRecord
+        the recorded alpha (angle) values
+    selection : MDAnalysis.AtomGroup
+        the selection to make the analysis of
+    """
+    def add_arguments(self, parser):
+        parser.add_argument('-m','--mask',help="the selectiom mask")
+        parser.add_argument('-o','--out',help="the output filename",default="gyration.txt")
+
+    def setup(self,args):
+        self.selection = self.processor.universe.select_atoms(args.mask).residues
+        self.records = []
+        self.out = args.out
+
+    def process(self):
+        g = [r.radius_of_gyration(pbc=False)*0.1 for r in self.selection]
+        self.records.append(MDRecord(self.processor.currtime, g))
+
+    def finalize(self):
+        self._write_records()
+
+class SoluteOrientation(TrajectoryAction):
+    """
+    Class to analyse the orientation of a solute
+
+    Attributes
+    ----------
+    axis : ndarray
+        the reference axis
+    records : list of MDRecord
+        the recorded alpha (angle) values
+    sel : MDAnalysis.AtomGroup
+        the selection mask
+    """
+    def add_arguments(self, parser):
+        parser.add_argument('-m','--mask', help="the selectiom mask")
+        parser.add_argument('--axis', nargs=3, type=float, help="the reference axis", default=[0.0,0.0,1.0])
+        parser.add_argument('-o','--out',help="the output filename",default="orient.txt")
+
+    def setup(self,args):
+        self.sel = self.processor.universe.select_atoms(args.mask).residues
+        print "Selected %d"%len(self.sel)
+        self.axis = np.asarray(args.axis)
+        self.records = []
+        self.out = args.out
+
+    def process(self):
+        vec = [r.principal_axes()[0] for r in self.sel]
+        proj = np.asarray([np.dot(v, self.axis) / (np.linalg.norm(v)*np.linalg.norm(self.axis)) \
+                            for v in vec])
+        orient = np.arccos(proj)*180/np.pi
+        self.records.append(MDRecord(self.processor.currtime, orient))
+
+    def finalize(self):
+        self._write_records(postfix="_dt.dat")
+
+        orient = np.asarray([r.value for r in self.records])
+        avorient = orient.mean(axis=0)
+        stdorient = orient.std(axis=0) #/ np.sqrt(orient.shape[0])
+        proj = np.cos(orient)
+        order = np.abs(0.5*(3.0*proj*proj-1).mean(axis=0))
+        stdorder = 0.5*(3.0*proj*proj-1).std(axis=0) #/ np.sqrt(orient.shape[0])
+        with open(self.out+".dat", "w") as f :
+            f.write("\t".join(["%.3f\t%.3f"%(o,e) for o, e in zip(avorient, stdorient)]))
+            f.write("\t")
+            f.write("\t".join(["%.3f\t%.3f"%(o,e) for o, e in zip(order, stdorder)]))
+            f.write("\n")
 
 class StripAtoms(TrajectoryAction) :
 

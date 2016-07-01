@@ -30,7 +30,7 @@ if __name__ == '__main__' :
     parser = argparse.ArgumentParser(description="Plot images on a grid")
     parser.add_argument('-f','--file',nargs="+",help="the images")
     parser.add_argument('-c','--config',type=int,nargs=2,help="the configuration of the file")
-    parser.add_argument('-s','--size',type=float,nargs=2,help="the size of the figure")
+    parser.add_argument('-s','--size',type=float,nargs=2,help="the size of the figure", default=[3.33, 2.5])
     parser.add_argument('-l','--labels',nargs="+",help="the labels")
     parser.add_argument('-o','--out',help="the output filename",default="gridimg.png")
     parser.add_argument('--borders',action="store_true",help="plot border between the figures",default=False)
@@ -54,12 +54,12 @@ if __name__ == '__main__' :
     if args.labels is not None and len(args.labels) == len(args.file) :
         labels = ["%s %s"%(lbl0,albl) for lbl0,albl in zip(labels,args.labels)]
 
-    props = dict(facecolor='white',edgecolor='white', alpha=0.8)
+    props = dict(facecolor='white',edgecolor='white', alpha=1.0)
     for i,(filename,label) in enumerate(zip(args.file,labels),1) :
         ax = f.add_subplot(config.height,config.width,i)
         im = mimage.imread(filename)
         ax.imshow(im)
-        ax.text(0.05,0.92,label,transform=ax.transAxes,bbox=props,size=10)
+        ax.text(0.01,0.92,label,transform=ax.transAxes,bbox=props,size=10)
         ax.set_xticks([])
         ax.set_yticks([])
 

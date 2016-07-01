@@ -42,10 +42,10 @@ if __name__ == "__main__":
   # Move protein to center of mass
   center = pdbfile.xyz.mean(axis=0)
   xyz = pdbfile.xyz - center
-  
+
   # Calculate principl axis and align with user selected axis
-  moi = geo.momentOfInertia(xyz,masses)
-  princip = geo.principalAxes(moi)
+  moi = geo.moment_of_inertia(xyz,masses)
+  princip = geo.principal_axes(moi)
   rotvec = geo.rotaxis(princip[0,:],normv)
   alpha = geo.angle(princip[0,:],normv)
   rotmat = geo.rotation_matrix(alpha,rotvec)

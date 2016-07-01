@@ -47,6 +47,7 @@ std_aa_names["ARG"]="N H CA HA CB HB2 HB3 CG HG2 HG3 CD HD2 HD3 NE HE CZ NH1 HH1
 std_aa_names["HID"]="N H CA HA CB HB2 HB3 CG ND1 HD1 CE1 HE1 NE2 CD2 HD2 C O".split()
 std_aa_names["HIE"]="N H CA HA CB HB2 HB3 CG ND1 CE1 HE1 NE2 HE2 CD2 HD2 C O".split()
 std_aa_names["HIP"]="N H CA HA CB HB2 HB3 CG ND1 HD1 CE1 HE1 NE2 HE2 CD2 HD2 C O".split()
+std_aa_names["HIS"]="N H CA HA CB HB2 HB3 CG ND1 HD1 CE1 HE1 NE2 CD2 HD2 C O".split()
 std_aa_names["LYS"]="N H CA HA CB HB2 HB3 CG HG2 HG3 CD HD2 HD3 CE HE2 HE3 NZ HZ1 HZ2 HZ3 C O".split()
 std_aa_names["ASP"]="N H CA HA CB HB2 HB3 CG OD1 OD2 C O".split()
 std_aa_names["GLU"]="N H CA HA CB HB2 HB3 CG HG2 HG3 CD OE1 OE2 C O".split()
@@ -120,7 +121,7 @@ class PDBFile :
   box : numpy array
     the box information
   """
-  def __init__(self,filename=None)  :
+  def __init__(self,filename=None, **kwargs)  :
     self.atoms = []
     self.residues = []
     self.chains = []
@@ -129,7 +130,7 @@ class PDBFile :
     self.charged = None
     self.box = None
     if filename != None :
-      self.read(filename)
+      self.read(filename, **kwargs)
 
   def extend(self,other) :
     """
@@ -276,7 +277,7 @@ class PDBFile :
        atom.z = coord[2]
        atom.xyz = np.array(coord,copy=True)
 
-  def read(self,filename,gro=False) :
+  def read(self,filename,gro=False, **kwargs) :
     """
     Read a PDB-file or GRO-file and parse into atoms, residues and chains
 
@@ -292,7 +293,7 @@ class PDBFile :
       self.__parse_gro_records()
     else :
       self.__parse_records()
-    self.__parse_residues()
+    self.__parse_residues(**kwargs)
     self.__parse_chains()
 
   def write(self,filename=None,ter=False,add_extra=None) :
@@ -372,8 +373,9 @@ class PDBFile :
     aserial = 1
     for atom in self.atoms :
       if atom.hidden : continue
+      resid = (atom.residue if atom.residue <= 99999 else atom.residue - 99999)
       serial = (aserial if aserial <= 99999 else aserial - 99999)
-      f.write("%5d%5s%5s%5d%8.3f%8.3f%8.3f\n"%(atom.residue,atom.resname,atom.name,serial,atom.x/10.0,atom.y/10.0,atom.z/10.0))
+      f.write("%5d%5s%5s%5d%8.3f%8.3f%8.3f\n"%(resid,atom.resname,atom.name,serial,atom.x/10.0,atom.y/10.0,atom.z/10.0))
       aserial += 1
     if self.box is not None :
       f.write("%8.3f%8.3f%8.3f\n"%(self.box[0]/10.0,self.box[1]/10.0,self.box[2]/10.0))
@@ -405,7 +407,7 @@ class PDBFile :
       last = i-1
       self.chains.append((first,last))
 
-  def __parse_residues(self) :
+  def __parse_residues(self, renumber=True) :
     """
     Produce an array of Residue objectes from an array of Atom objects
     """
@@ -418,7 +420,8 @@ class PDBFile :
       else :
         self.residues[-1].append(atom)
 
-    for i,residue in enumerate(self.residues,1):
+    if renumber :
+      for i,residue in enumerate(self.residues,1):
         residue.set_serial(i)
 
   def __parse_records(self) :
@@ -689,7 +692,14 @@ class Residue :
       self.resname = atom.resname
       self.chain = atom.chain
       self.hidden = atom.hidden
-
+  def atom_by_name(self, name) :
+      """
+      Return an atom in this residue by its name
+      """
+      for atom in self.atoms:
+          if atom.name.strip() == name :
+              return atom
+      return None
   def check_heavy(self) :
     """
     Check if an amino acid residue is complete
@@ -791,7 +801,7 @@ class Residue :
       return vector[:,0]
     return vector
 
-  def reorder(self,atomnames) :
+  def reorder(self, atomnames) :
     """
     Reorder the atoms according to a given list of atom names
     """
