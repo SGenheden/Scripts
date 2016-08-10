@@ -420,8 +420,8 @@ class PairParam :
     try :
       test = float(cols[5+off])
       if self.func == "lj/sf/dipole/sf" :
-        self.scale = float(cols[5+off])
-        off = off + 1
+        self.scale = float(cols[6+off])
+        off = off + 2
       else :
         self.epsilon14 = float(cols[5+off])
         self.sigma14 = float(cols[6+off])
@@ -433,7 +433,7 @@ class PairParam :
   def __str__(self) :
     str14 = ""
     if self.func == "lj/sf/dipole/sf" and self.scale is not None:
-      str14 = "%15.3f"%self.scale
+      str14 = " scale %15.3f"%self.scale
     else :
       if self.sigma14 != 0.0 :
         str14 = " %15.10f %15.10f"%(self.epsilon14,self.sigma14)
