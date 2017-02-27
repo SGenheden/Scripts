@@ -38,7 +38,7 @@ class AtomType :
       self.mass = 0.0
     if len(cols) > 3 :
       self.charge = float(cols[3])
-      offset = 1 
+      offset = 1
       try :
         self.sigma = float(cols[5])
         offset = 0
@@ -70,10 +70,10 @@ class PairType :
     self.epsilon = float(cols[4])
   def __str__(self) :
     return "%s %s %.2E %.2E"%(self.atomj,self.atomi,self.sigma,self.epsilon)
- 
+
 #
 # Class to hold a Connectivity (bond,angle,dihedral) type record
-#   
+#
 class ConnectivityType :
   def __init__(self,record=None,natoms=None) :
     self.record = ""
@@ -95,8 +95,8 @@ class ConnectivityType :
       pass
     self.params = []
     for i in cols[natoms+1:] :
-      try : 
-        ii  = float(i) 
+      try :
+        ii  = float(i)
         self.params.append(ii)
       except :
         self.params.append(i)
@@ -107,7 +107,7 @@ class ConnectivityType :
       for params in self.addparams :
         paramstr = paramstr + "\n\t %s"%" ".join(["%.2f"%i for i in params])
     return "%s %d %s"%(atomstr,self.func,paramstr)
-    
+
 #
 # Class to hold an atom record
 #
@@ -141,7 +141,7 @@ class MolAtom :
 
 #
 # Class to hold a molecular topology (bond,angle,dihedral)
-#   
+#
 class Connectivity :
   def __init__(self,record=None,natoms=None) :
     self.atoms = []
@@ -155,7 +155,10 @@ class Connectivity :
     if i > -1 : record = record[:i]
     cols = record.strip().split()
     self.atoms = [int(i) for i in cols[:natoms]]
-    self.func = int(cols[natoms])
+    try :
+        self.func = int(cols[natoms])
+    except :
+        pass
     try :
       self.params = [float(i) for i in cols[natoms+1:]]
     except :
@@ -167,7 +170,7 @@ class Connectivity :
 
 #
 # Class to read a molecular type
-#      
+#
 class MoleculeType :
   def __init__(self) :
     self.name = None
@@ -179,23 +182,23 @@ class MoleculeType :
   # Read several atom records
   def __read_atoms(self,lines,lineidx) :
     while lineidx < len(lines) and lines[lineidx].find("[") == -1 :
-      if not (lines[lineidx][0] in [";","#"] or len(lines[lineidx].strip()) < 2) : 
+      if not (lines[lineidx][0] in [";","#"] or len(lines[lineidx].strip()) < 2) :
         self.atoms.append(MolAtom(record=lines[lineidx]))
       lineidx = lineidx + 1
-    return lineidx  
-  # Read several topology records  
+    return lineidx
+  # Read several topology records
   def __read_connectivity(self,lines,lineidx,container,natoms) :
     while lineidx < len(lines) and lines[lineidx].find("[") == -1 :
-      if not (lines[lineidx][0] in [";","#"] or len(lines[lineidx].strip()) < 2) : 
+      if not (lines[lineidx][0] in [";","#"] or len(lines[lineidx].strip()) < 2) :
         container.append(Connectivity(record=lines[lineidx],natoms=natoms))
       lineidx = lineidx + 1
-    return lineidx 
-  # Parse a full molecular type from a file  
+    return lineidx
+  # Parse a full molecular type from a file
   def read(self,lines,lineidx) :
-       
+
     while lines[lineidx][0] == ";" or len(lines[lineidx])  < 2 : lineidx = lineidx + 1
     self.name = lines[lineidx].strip().split()[0]
-    
+
     while lineidx < len(lines) and lines[lineidx].find("[ moleculetype ]") == -1 :
       if lines[lineidx].find("[ atoms ]") > -1 or lines[lineidx].find("[atoms]") > -1:
         lineidx = self.__read_atoms(lines,lineidx+1)
@@ -208,7 +211,7 @@ class MoleculeType :
       elif lines[lineidx].find("[ dihedrals ]") > -1 or lines[lineidx].find("[dihedrals]") > -1:
         lineidx = self.__read_connectivity(lines,lineidx+1,self.dihedrals,4)
       else :
-        lineidx = lineidx + 1  
+        lineidx = lineidx + 1
     return lineidx
   def __str__(self) :
     str = self.name+"\n"
@@ -254,7 +257,7 @@ class TopFile :
         lineidx = lineidx + 1
         while lines[lineidx][0] == ";" or len(lines[lineidx])  < 2 : lineidx = lineidx + 1
         self.name = lines[lineidx].strip().split()[0]
-      elif lines[lineidx].find("[ defaults ]") == 0 : 
+      elif lines[lineidx].find("[ defaults ]") == 0 :
         lineidx = lineidx + 1
         while lines[lineidx][0] == ";" or len(lines[lineidx])  < 2 : lineidx = lineidx + 1
         cols = lines[lineidx].strip().split()
@@ -265,8 +268,8 @@ class TopFile :
           self.specialLJ = 1.0
           self.specialCoul = 1.0
       elif lines[lineidx].find("[ moleculetype ]") == 0 :
-        self.moleculetypes.append(MoleculeType()) 
-        lineidx = self.moleculetypes[-1].read(lines,lineidx+1) 
+        self.moleculetypes.append(MoleculeType())
+        lineidx = self.moleculetypes[-1].read(lines,lineidx+1)
       elif lines[lineidx].find("[ atomtypes ]") == 0 :
         lineidx = self.__read_records(lines,lineidx+1,AtomType,self.atomtypes)
       elif lines[lineidx].find("[ pairtypes ]") == 0 or lines[lineidx].find("[ nonbond_params ]") == 0:
@@ -278,12 +281,12 @@ class TopFile :
       elif lines[lineidx].find("[ dihedraltypes ]") == 0 :
         lineidx = self.__read_records(lines,lineidx+1,ConnectivityType,self.dihedraltypes,extra=4)
       elif lines[lineidx].find("[ molecules ]") == 0 :
-         lineidx = self.__read_molecules(lines,lineidx+1) 
+         lineidx = self.__read_molecules(lines,lineidx+1)
       else :
         lineidx = lineidx + 1
   def __read_molecules(self,lines,lineidx) :
     while lineidx < len(lines) and lines[lineidx].find("[ ") == -1 :
-      if not (lines[lineidx][0] == ";" or len(lines[lineidx]) < 2) : 
+      if not (lines[lineidx][0] == ";" or len(lines[lineidx]) < 2) :
         cols = lines[lineidx].strip().split()
         self.molecules[cols[0]] = int(cols[1])
         self.mollist.append(cols[0])
@@ -291,13 +294,13 @@ class TopFile :
     return lineidx
   def __read_records(self,lines,lineidx,classtype,container,extra=None) :
     while lineidx < len(lines) and lines[lineidx].find("[ ") == -1 :
-      if not (lines[lineidx][0] == ";" or len(lines[lineidx].strip()) < 2) : 
+      if not (lines[lineidx][0] == ";" or len(lines[lineidx].strip()) < 2) :
         if extra == None :
           container.append(classtype(lines[lineidx]))
         else :
           container.append(classtype(lines[lineidx],extra))
       lineidx = lineidx + 1
-    return lineidx 
+    return lineidx
   def read(self,filename) :
     self.__include(filename)
     #self.__pair_dihedrals()
@@ -335,7 +338,7 @@ class TopFile :
         new_dihedraltypes[-1].func = 3
         new_dihedraltypes[-1].params = geo.multi2RB(forces,multiplicities,phases)
     self.dihedraltypes = new_dihedraltypes
-    
+
     for mol in self.moleculetypes :
       for dihedral in mol.dihedral :
         if dihedral.func == 9 : dihedral.func = 3
