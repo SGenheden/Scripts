@@ -20,6 +20,7 @@ except:
 from . import pbc
 from . import geo
 from . import groups
+from . import mol
 
 MDRecord = namedtuple("MDRecord",["time","value"])
 
@@ -179,10 +180,10 @@ class CenterWholeAlign(TrajectoryAction):
     def process(self):
         if not self.nowhole :
             if len(self.protsel) > 0:
-                xyz = pbc.make_whole_xyz(self.protsel.get_positions(),self.processor.currbox)
+                xyz = pbc.make_whole_xyz(self.protsel.positions,self.processor.currbox)
                 self.protsel.set_positions(xyz)
             for res in self.residues :
-                xyz = pbc.make_whole_xyz(res.get_positions(),self.processor.currbox)
+                xyz = pbc.make_whole_xyz(res.positions,self.processor.currbox)
                 res.set_positions(xyz)
         if not self.nocenter :
             self._center()
@@ -340,13 +341,13 @@ class ChainOrderAnalysis(TrajectoryAction):
             if self.resgroups is None:
                 for selection in self.selections :
                     for a1, a2 in zip(selection[:-1],selection[1:]):
-                        orders.append(self._calc_order(a1.get_positions(),
-                                        a2.get_positions(), self.normal))
+                        orders.append(self._calc_order(a1.positions,
+                                        a2.positions, self.normal))
             else:
                 if self.processor.nprocessed == 1:
                     f = open(self.out+"_first_pseudo.xyz", "w")
                 for selection in self.selections :
-                    xyz = np.dot(selection.transmat, selection.atomgroup.get_positions())
+                    xyz = np.dot(selection.transmat, selection.atomgroup.positions)
                     if self.processor.nprocessed == 1:
                         for pos in xyz:
                             f.write("c %.3f %.3f %.3f\n"%(pos[0], pos[1], pos[2]))
@@ -358,8 +359,8 @@ class ChainOrderAnalysis(TrajectoryAction):
         elif self.analtype == "CH":
             for cselection, hselection in zip(self.selections, self.hselections):
                 for a1, a2 in zip(cselection, hselection):
-                    orders.append(self._calc_order(a1.get_positions(),
-                                    a2.get_positions(), self.normal))
+                    orders.append(self._calc_order(a1.positions,
+                                    a2.positions, self.normal))
         self.records.append(MDRecord(self.processor.currtime, orders))
 
     def _calc_order(self,a1,a2,norm):
@@ -513,6 +514,126 @@ class IredAnalysis(TrajectoryAction):
             if self.uselib == "dict":
                 av = np.asarray(reslist).mean()
                 f.write("%s %d %.5f\n"%(atm.resname,atm.resnum+self.resoffset,av))
+
+class MemDensAnalysis(TrajectoryAction) :
+
+    def add_arguments(self, parser):
+        parser.add_argument('--pmask',help="the selectiom mask for phosphor atoms",default="name P")
+        parser.add_argument('--wmask',help="the selectiom mask for water atoms",default="name OH2")
+        parser.add_argument('--smask',help="the selectiom mask for solute atoms")
+        parser.add_argument('-o','--out',help="the output prefix",default="memdens")
+
+    def setup(self, args):
+        self.dosubsample = True
+        self.out = args.out
+        self.phosphorsel = self.processor.universe.select_atoms(args.pmask)
+        self.watersel = self.processor.universe.select_atoms(args.wmask)
+        self.allsel = self.processor.universe.select_atoms("all")
+        print "Number of phosphor (%d) and water (%d) atoms"%(
+                len(self.phosphorsel), len(self.watersel))
+
+        if args.smask is not None :
+            self.solute = self.processor.universe.select_atoms(args.smask)
+            print "Number of solute atoms = %d"%len(self.solute)
+        else :
+            self.solute = None
+
+        self.nphosphor = 1.0 / float(len(self.phosphorsel))
+        self.nwater = 1.0 / float(len(self.watersel))
+
+        # Setup edges to cover the entire simulation box
+        zpos = self.processor.universe.coord._pos[:,2] - self.allsel.positions[:,2].mean()
+        self.resolution = 0.25
+        self.edges = np.arange(zpos.min(),zpos.max()+self.resolution,self.resolution)
+        self.zvals = 0.5 * (self.edges[:-1] + self.edges[1:]) * 0.1
+
+        self.pdensity_curr = np.zeros(self.edges.shape[0]-1)
+        self.wdensity_curr = np.zeros(self.edges.shape[0]-1)
+        self.pdensity = []
+        self.wdensity = []
+        if self.solute is not None :
+            self.sdensity_curr = np.zeros(self.edges.shape[0]-1)
+            self.solute_snapshots = 0
+            self.sdensity = []
+
+        self.records = []
+
+    def process(self) :
+
+        zpos = self.phosphorsel.positions[:,2] - self.allsel.positions[:,2].mean()
+        hist, b = np.histogram(zpos, bins=self.edges)
+        self.pdensity_curr += hist
+
+        zpos = self.watersel.positions[:,2] - self.allsel.positions[:,2].mean()
+        hist, b = np.histogram(zpos, bins=self.edges)
+        self.wdensity_curr += hist
+
+        if self.solute is not None :
+            zpos = self.solute.positions[:,2] - self.allsel.positions[:,2].mean()
+            hist, b = np.histogram(zpos, bins=self.edges)
+            self.sdensity_curr += hist
+            self.solute_snapshots += 1
+
+    def subsample(self) :
+
+        # Calculate D_hh
+        midi = int(0.5 * self.pdensity_curr.shape[0])
+        dens_first = self.pdensity_curr[:midi]
+        dens_last = self.pdensity_curr[midi:]
+        max_first = np.argmax(dens_first)
+        max_last = midi + np.argmax(dens_last)
+        dhh =  (max_last -  max_first) * 0.1 * self.resolution
+
+        # Calculate intercept of water and phosphor density,
+        # and from that the membrane volume
+        firsti, lasti = mol.density_intercept(self.wdensity_curr, self.pdensity_curr)
+        firstz = self.zvals[firsti]
+        lastz = self.zvals[lasti]
+        memfrac = (lastz - firstz) / (self.processor.currbox[2] * 0.1)
+
+        # Calculate how many solutes there are inside the membrane
+        if self.solute is not None :
+            nfreq = 1 / float(self.processor.freq)
+            solute_dens = self.sdensity_curr / float(self.solute_snapshots)
+            ninside = int(np.round(solute_dens[firsti:lasti+1].sum()))
+            self.records.append(MDRecord(self.processor.currtime, [dhh, lastz - firstz,
+                            self.processor.currbox[2] * 0.1, memfrac, ninside]))
+
+        else :
+            self.records.append(MDRecord(self.processor.currtime, [dhh, lastz - firstz,
+                self.processor.currbox[2] * 0.1, memfrac]))
+
+        # Store away the accumulayed densities and zero them
+        self.pdensity.append(self.pdensity_curr)
+        self.wdensity.append(self.wdensity_curr)
+        self.pdensity_curr = np.zeros(self.edges.shape[0]-1)
+        self.wdensity_curr = np.zeros(self.edges.shape[0]-1)
+
+        if self.solute is not None :
+            self.sdensity.append(self.sdensity_curr)
+            self.sdensity_curr = np.zeros(self.edges.shape[0]-1)
+            self.solute_snapshots = 0
+
+    def finalize(self):
+
+        def _write_density(density, scaling, postfix) :
+            density = np.asarray(density) * scaling
+            with open(self.out+postfix, "w") as f :
+                for z, av, err in zip(self.zvals, density.mean(axis=0),
+                        density.std(axis=0)/np.sqrt(density.shape[0])) :
+                    f.write("%.3f %.3f %.3f\n"%(z, av, err))
+
+        _write_density(self.pdensity, self.nphosphor, "_pdens.dat")
+        _write_density(self.wdensity, self.nwater, "_wdens.dat")
+        if self.solute is not None :
+            _write_density(self.sdensity, 1.0 / len(self.solute), "_sdens.dat")
+        self._write_records(postfix="_dt.txt")
+
+        vals = np.asarray([entry.value for entry in self.records])
+        with open(self.out+".txt", "w") as f :
+            f.write(" ".join("%.3f %.3f"%(av, err) for av, err in zip(vals.mean(axis=0),
+                        vals.std(axis=0)/np.sqrt(vals.shape[0])))+"\n")
+
 
 class MempropAnalysis(TrajectoryAction):
     def add_arguments(self, parser):
@@ -706,7 +827,7 @@ class PrincipalAxisAnalysis(TrajectoryAction):
         self.out = args.out
 
     def process(self):
-        xyz = pbc.make_whole_xyz(self.selection.get_positions(),
+        xyz = pbc.make_whole_xyz(self.selection.positions,
                                     self.processor.currbox)
         moi = geo.moment_of_inertia(xyz-xyz.mean(axis=0),self.masses)
         princip = geo.principal_axes(moi)
@@ -873,19 +994,49 @@ class SoluteOrientation(TrajectoryAction):
         the selection mask
     """
     def add_arguments(self, parser):
-        parser.add_argument('-m','--mask', help="the selectiom mask")
+        parser.add_argument('-m','--mask', nargs="+", help="the selectiom mask")
         parser.add_argument('--axis', nargs=3, type=float, help="the reference axis", default=[0.0,0.0,1.0])
-        parser.add_argument('-o','--out',help="the output filename",default="orient.txt")
+        parser.add_argument('--zmask', help="the selection mask for z-partition")
+        parser.add_argument('--zpart', nargs="+", type=float, help="the z-partition")
+        parser.add_argument('-o','--out',help="the output filename",default="orient")
 
     def setup(self,args):
-        self.sel = self.processor.universe.select_atoms(args.mask).residues
-        print "Selected %d"%len(self.sel)
+        if len(args.mask) == 1 :
+            self.sel = self.processor.universe.select_atoms(args.mask).residues
+            print "Selected %d"%len(self.sel)
+        else :
+            self.sel = [self.processor.universe.select_atoms(args.mask[0]),
+                self.processor.universe.select_atoms(args.mask[1])]
+            print "Selected %d"%len(self.sel[0])
+        if args.zmask is not None :
+            args.axis = [0.0,0.0,1.0]
+            self.zmask = self.processor.universe.select_atoms(args.zmask)
+            self.zpart = np.asarray(args.zpart)
+        else:
+            self.zmask = None
         self.axis = np.asarray(args.axis)
         self.records = []
         self.out = args.out
 
     def process(self):
-        vec = [r.principal_axes()[0] for r in self.sel]
+
+        def _partz(i) :
+            if self.zmask is None :
+                return True
+            else :
+                zpos = self.zmask[i].position[2]
+                if len(self.zpart) == 2 :
+                    return zpos >= self.zpart[0] and zpos <= self.zpart[1]
+                elif len(self.zpart) == 4 :
+                    return (zpos >= self.zpart[0] and zpos <= self.zpart[1]) or \
+                         (zpos >= self.zpart[2] and zpos <= self.zpart[3])
+                else :
+                    return True
+
+        if len(self.sel) == 1 :
+            vec = [r.principal_axes()[0] for i, r in enumerate(self.sel) if _partz(i)]
+        else :
+            vec = [a2.position - a1.position for i, (a1, a2) in enumerate(zip(self.sel[0],self.sel[1])) if _partz(i)]
         proj = np.asarray([np.dot(v, self.axis) / (np.linalg.norm(v)*np.linalg.norm(self.axis)) \
                             for v in vec])
         orient = np.arccos(proj)*180/np.pi
@@ -894,17 +1045,22 @@ class SoluteOrientation(TrajectoryAction):
     def finalize(self):
         self._write_records(postfix="_dt.dat")
 
-        orient = np.asarray([r.value for r in self.records])
-        avorient = orient.mean(axis=0)
-        stdorient = orient.std(axis=0) #/ np.sqrt(orient.shape[0])
-        proj = np.cos(orient)
-        order = np.abs(0.5*(3.0*proj*proj-1).mean(axis=0))
-        stdorder = 0.5*(3.0*proj*proj-1).std(axis=0) #/ np.sqrt(orient.shape[0])
-        with open(self.out+".dat", "w") as f :
-            f.write("\t".join(["%.3f\t%.3f"%(o,e) for o, e in zip(avorient, stdorient)]))
-            f.write("\t")
-            f.write("\t".join(["%.3f\t%.3f"%(o,e) for o, e in zip(order, stdorder)]))
-            f.write("\n")
+        if self.zmask is None :
+            orient = np.asarray([r.value for r in self.records])
+            avorient = orient.mean(axis=0)
+            stdorient = orient.std(axis=0) #/ np.sqrt(orient.shape[0])
+            proj = np.cos(orient)
+            order = np.abs(0.5*(3.0*proj*proj-1).mean(axis=0))
+            stdorder = 0.5*(3.0*proj*proj-1).std(axis=0) #/ np.sqrt(orient.shape[0])
+            with open(self.out+".dat", "w") as f :
+                f.write("\t".join(["%.3f\t%.3f"%(o,e) for o, e in zip(avorient, stdorient)]))
+                f.write("\t")
+                f.write("\t".join(["%.3f\t%.3f"%(o,e) for o, e in zip(order, stdorder)]))
+                f.write("\n")
+        with open(self.out+"_flat.dat", "w") as f :
+            for r in self.records :
+                for v in r.value :
+                    f.write("%.3f\n"%v)
 
 class StripAtoms(TrajectoryAction) :
 
