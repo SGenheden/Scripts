@@ -515,6 +515,91 @@ class IredAnalysis(TrajectoryAction):
                 av = np.asarray(reslist).mean()
                 f.write("%s %d %.5f\n"%(atm.resname,atm.resnum+self.resoffset,av))
 
+class MemBulkAnalysis(TrajectoryAction) :
+
+    def add_arguments(self, parser):
+        parser.add_argument('--pmask',help="the selectiom mask for phosphor atoms",default="name P")
+        parser.add_argument('--wmask',help="the selectiom mask for water atoms",default="name OH2")
+        parser.add_argument('--smask',help="the selectiom mask for solute atoms")
+        parser.add_argument('--sconc',type=float, help="the target solute concentration",default=1.0)
+        parser.add_argument('--svol',type=float, help="the solute number volume",default=1.0)
+        parser.add_argument('--wvol',type=float, help="the water number volume",default=0.0181)
+
+    def setup(self, args):
+        self.phosphorsel = self.processor.universe.select_atoms(args.pmask)
+        self.watersel = self.processor.universe.select_atoms(args.wmask)
+        self.allsel = self.processor.universe.select_atoms("all")
+        print "Number of phosphor (%d) and water (%d) atoms"%(
+                len(self.phosphorsel), len(self.watersel))
+
+        if args.smask is not None :
+            self.solute = self.processor.universe.select_atoms(args.smask)
+            print "Number of solute atoms = %d"%len(self.solute)
+        else :
+            self.solute = None
+
+        self.nphosphor = 1.0 / float(len(self.phosphorsel))
+        self.nwater = 1.0 / float(len(self.watersel))
+
+        # Setup edges to cover the entire simulation box
+        zpos = self.processor.universe.coord._pos[:,2] - self.allsel.positions[:,2].mean()
+        self.resolution = 0.25
+        self.edges = np.arange(zpos.min(),zpos.max()+self.resolution,self.resolution)
+        self.zvals = 0.5 * (self.edges[:-1] + self.edges[1:]) * 0.1
+
+        self.pdensity = np.zeros(self.edges.shape[0]-1)
+        self.wdensity = np.zeros(self.edges.shape[0]-1)
+        self.wdensity_now = np.zeros(self.edges.shape[0]-1)
+        if self.solute is not None :
+            self.sdensity_now = np.zeros(self.edges.shape[0]-1)
+
+        self.sconc = args.sconc
+        self.svol = args.svol
+        self.wvol = args.wvol
+
+    def process(self) :
+
+        zpos = self.phosphorsel.positions[:,2] - self.allsel.positions[:,2].mean()
+        hist, b = np.histogram(zpos, bins=self.edges)
+        self.pdensity += hist
+
+        zpos = self.watersel.positions[:,2] - self.allsel.positions[:,2].mean()
+        hist, b = np.histogram(zpos, bins=self.edges)
+        self.wdensity += hist
+        self.wdensity_now = hist
+
+        if self.solute is not None :
+            zpos = self.solute.positions[:,2] - self.allsel.positions[:,2].mean()
+            hist, b = np.histogram(zpos, bins=self.edges)
+            self.sdensity_curr = hist
+
+    def finalize(self):
+
+        # Calculate how many water molecules in the bulk
+        firsti, lasti = mol.density_intercept(self.wdensity, self.pdensity)
+        nbulkwat = int(np.round(self.wdensity_now[:firsti].sum()
+                                +self.wdensity_now[lasti+1:].sum()))
+        print "Nwat\t%d"%nbulkwat
+
+        # Calculate how many solutes there are outside the membrane
+        if self.solute is not None :
+            nbulksol = int(np.round(self.sdensity_now[:firsti].sum()
+                                    +self.sdensity_now[lasti+1:].sum()))
+        else :
+            nbulksol = 0
+        print "Nsol\t%d"%nbulksol
+
+        ntot = nbulkwat + nbulksol
+        ntarget = np.round(ntot*self.wvol/(1.0/self.sconc+self.wvol-self.svol))
+        nadd = ntarget-nbulksol
+        if nadd % 2 == 0 :
+            nadd = (0.5*nadd , 0.5*nadd)
+        else :
+            nadd = (np.ceil(0.5*nadd) , np.floor(0.5*nadd))
+        print "Nadd\t%d\t%d"%nadd
+
+
+
 class MemDensAnalysis(TrajectoryAction) :
 
     def add_arguments(self, parser):
