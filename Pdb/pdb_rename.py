@@ -62,7 +62,7 @@ if __name__ == "__main__":
         residue.resname = new
         for atom in residue.atoms : atom.resname = new
 
-  if args.out is None :  
+  if args.out is None :
     s = os.path.splitext(args.file)
     args.out = s[0]+"_"+args.to.lower()+s[1]
   pdbin.write_gro(args.out)
