@@ -167,9 +167,9 @@ class CenterWholeAlign(TrajectoryAction):
         self.residues = []
         self.residue_atoms = []
         for res in self.processor.universe.select_atoms("not "+args.pmask).residues:
-            if len(res) > 1 :
+            if len(res.atoms) > 1 :
                 self.residues.append(res)
-            self.residue_atoms.append(ResidueAtoms(res[0].number,res[-1].number))
+            self.residue_atoms.append(ResidueAtoms(res.atoms[0].index,res.atoms[-1].index))
 
         self.records = []
         self.writer = md.Writer(args.out,
@@ -199,7 +199,10 @@ class CenterWholeAlign(TrajectoryAction):
         Write out the RMSDs to disc and close the output trajectory
         """
         self._write_records(postfix="_rmsd.txt")
-        self.writer.close_trajectory()
+        try :
+            self.writer.close_trajectory()
+        except :
+            pass
 
     def _center(self) :
         xyz = self.processor.currsnap._pos
