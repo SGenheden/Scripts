@@ -16,6 +16,7 @@ try :
     import pyvoro
 except:
     pass
+from scipy.spatial.distance import cdist
 
 from . import pbc
 from . import geo
@@ -125,6 +126,48 @@ class TrajectoryAction(object):
 
 ResidueAtoms = namedtuple("ResidueAtoms",["first","last"])
 
+class AnalysisGrid(object) :
+
+    """
+    Class to store a 2D grid for analysis
+
+    Attributes
+    ----------
+    resolution : float
+        the resolution, i.e. the size of each pixel
+    edgesx : NumpyArray
+        the edges along the x-dimension
+    edgesy : NumpyArray
+        the edges along the y-dimension
+    matrix : NumpyArray
+        the discretised data
+    """
+    def __init__(self, xyz, resolution=1.0) :
+        xyz_shift = xyz - xyz.mean(axis=0)
+
+        self.edgesx = np.arange(xyz_shift[:,0].min(),
+                                    xyz_shift[:,0].max()+resolution, resolution)
+        self.edgesy = np.arange(xyz_shift[:,1].min(),
+                                    xyz_shift[:,1].max()+resolution, resolution)
+        self.resolution = resolution
+        self.matrix = np.zeros([self.edgesx.shape[0]+1, self.edgesy.shape[0]+1])
+
+    def indices(self, positions) :
+        """
+        Returns the grid coordinates for a set of Cartesian coordinates
+        """
+        xidx = np.digitize(positions[:,0], self.edgesx)
+        yidx = np.digitize(positions[:,1], self.edgesy)
+        return xidx, yidx
+
+    def write(self, filename) :
+
+        with open(filename, "w") as f :
+            for i in range(self.matrix.shape[0]) :
+                for j in range(self.matrix.shape[1]) :
+                    f.write("%.3f\t"%self.matrix[i,j])
+                f.write("\n")
+
 class CenterWholeAlign(TrajectoryAction):
     """
     Class to make MD snapshots whole over periodic boxes and to centre and
@@ -181,10 +224,10 @@ class CenterWholeAlign(TrajectoryAction):
         if not self.nowhole :
             if len(self.protsel) > 0:
                 xyz = pbc.make_whole_xyz(self.protsel.positions,self.processor.currbox)
-                self.protsel.set_positions(xyz)
+                self.protsel.positions = xyz
             for res in self.residues :
                 xyz = pbc.make_whole_xyz(res.positions,self.processor.currbox)
-                res.set_positions(xyz)
+                res.positions = xyz
         if not self.nocenter :
             self._center()
         if not self.noalign :
@@ -238,15 +281,32 @@ class ChainOrderAnalysis(TrajectoryAction):
         parser.add_argument('--selections',nargs="+", help="the chains")
         parser.add_argument('--analysis',choices=["CC","CH"], help="the type of analysis C-C or C-H", default="CC")
         parser.add_argument('--groups', help="group definitions for pseudo-atom calculation")
+        parser.add_argument('--gridout', help="the prefix for the filename of a 2D grid")
         parser.add_argument('-o', '--out', help="the output prefix", default="order")
 
     def setup(self, args):
 
         def _get_h(atomgrp):
             for atom2 in atomgrp[0].bonded_atoms :
-                if atom2.mass < 2.0 :
+                if atom2.mass < 5.0 :
                     return self.processor.universe.select_atoms("resname %s and name %s"%(atomgrp[0].resname,atom2.name))
             raise Exception("Could not find any H atom bonded to %s in %s"%(atomgrp[0].name,atomgrp[0].resname))
+
+        def _enumerateatoms(resname, atomstr) :
+
+            lipid = self.processor.universe.select_atoms("resname %s"%resname)[0].residue
+            base = atomstr[:-1]
+            atomi = int(atomstr[-1])
+            lst = []
+            while True :
+                try :
+                    name = "%s%d"%(base,atomi)
+                    dummy = lipid[name]
+                    lst.append(name)
+                    atomi += 1
+                except :
+                    break
+            return lst
 
         def _expandlist(liststr):
 
@@ -287,6 +347,8 @@ class ChainOrderAnalysis(TrajectoryAction):
                 atomlist = chainlist.split("-")
             elif chainlist.find("..") > -1:
                 atomlist = _expandlist(chainlist)
+            elif chainlist.startswith("@") :
+                atomlist = _enumerateatoms(resname, chainlist[1:])
             else:
                 raise Exception("Atom list need be specified with '-' or with expansion '(..)'")
 
@@ -337,15 +399,27 @@ class ChainOrderAnalysis(TrajectoryAction):
         self.normal = np.array([0.0,0.0,1.0])
         self.records = []
 
+        self.gridout = args.gridout
+        if args.gridout is None :
+            self.grid_low = None
+            self.grid_upp = None
+        else :
+            bounds = np.asarray([[0.0, 0.0, 0.0],self.processor.universe.dimensions[:3]])
+            self.grid_low = AnalysisGrid(bounds)
+            self.grid_upp = AnalysisGrid(bounds)
+            self.count_low = AnalysisGrid(bounds)
+            self.count_upp = AnalysisGrid(bounds)
+
     def process(self):
 
         orders = []
         if self.analtype == "CC":
             if self.resgroups is None:
                 for selection in self.selections :
+                    mid = selection[0].center_of_geometry()
                     for a1, a2 in zip(selection[:-1],selection[1:]):
                         orders.append(self._calc_order(a1.positions,
-                                        a2.positions, self.normal))
+                                        a2.positions, self.normal, mid))
             else:
                 if self.processor.nprocessed == 1:
                     f = open(self.out+"_first_pseudo.xyz", "w")
@@ -354,23 +428,43 @@ class ChainOrderAnalysis(TrajectoryAction):
                     if self.processor.nprocessed == 1:
                         for pos in xyz:
                             f.write("c %.3f %.3f %.3f\n"%(pos[0], pos[1], pos[2]))
+                    mid = xyz[selection.indices[0]].mean(axis=0)
                     for i1, i2 in zip(selection.indices[:-1], selection.indices[1:]):
                         orders.append(self._calc_order(xyz[i1,:],
-                                        xyz[i2,:], self.normal))
+                                        xyz[i2,:], self.normal, mid))
                 if self.processor.nprocessed == 1:
                     f.close()
         elif self.analtype == "CH":
             for cselection, hselection in zip(self.selections, self.hselections):
+                mid = cselection[0].center_of_geometry()
                 for a1, a2 in zip(cselection, hselection):
                     orders.append(self._calc_order(a1.positions,
-                                    a2.positions, self.normal))
+                                    a2.positions, self.normal, mid))
         self.records.append(MDRecord(self.processor.currtime, orders))
 
-    def _calc_order(self,a1,a2,norm):
+    def _calc_order(self, a1, a2, norm, mid):
         # Atom2 - Atom1
         vec = a2 - a1
         # Projection with normal
         proj = np.multiply(vec,norm).sum(axis=1)**2 / np.sum(vec**2,axis=1)
+
+        # Discretize on a grid
+        if self.grid_low is not None :
+            sel_low = a1[:, 2] < mid[2]
+            sel_upp = np.logical_not(sel_low)
+            idx_low = self.grid_low.indices(a1[sel_low]-mid)
+            idx_upp = self.grid_upp.indices(a1[sel_upp]-mid)
+            try :
+                self.grid_low.matrix[idx_low[0], idx_low[1]] += proj[sel_low]
+                self.count_low.matrix[idx_low[0], idx_low[1]] += 1.0
+            except :
+                pass
+            try :
+                self.grid_upp.matrix[idx_upp[0], idx_upp[1]] += proj[sel_upp]
+                self.count_upp.matrix[idx_upp[0], idx_upp[1]] += 1.0
+            except :
+                pass
+
         # Order param
         return np.abs(0.5*(3.0*proj.mean()-1))
 
@@ -403,6 +497,17 @@ class ChainOrderAnalysis(TrajectoryAction):
             for avs in selavs:
                 f.write("Av\t%.3f\t%.3f\t"%(avs.mean(),avs.std()/np.sqrt(avs.shape[0])))
             f.write("\n")
+
+        if self.grid_low is not None :
+            sel = self.count_low.matrix>0.0
+            self.grid_low.matrix[sel] /= self.count_low.matrix[sel]
+            self.grid_low.matrix[sel] = np.abs(0.5*(3.0*self.grid_low.matrix[sel]-1))
+            self.grid_low.write(self.gridout+"_low.dat")
+
+            sel = self.count_upp.matrix>0.0
+            self.grid_upp.matrix[sel] /= self.count_upp.matrix[sel]
+            self.grid_upp.matrix[sel] = np.abs(0.5*(3.0*self.grid_upp.matrix[sel]-1))
+            self.grid_upp.write(self.gridout+"_upp.dat")
 
 class IredAnalysis(TrajectoryAction):
     """
@@ -729,6 +834,7 @@ class MempropAnalysis(TrajectoryAction):
         parser.add_argument('--lipidmask',help="the selectiom mask for lipid residues",default="resname POPC")
         parser.add_argument('--watmask',help="the selectiom mask for water residues",default="resname SOL")
         parser.add_argument('--watvol',type=float,help="the volume of a water molecule in nm3",default=0.0306)
+        parser.add_argument('--gridout', help="the prefix for the filename of a 2D grid")
         parser.add_argument('-o','--out',help="the output prefix",default="memprop")
 
     def setup(self,args):
@@ -755,6 +861,17 @@ class MempropAnalysis(TrajectoryAction):
         self.sumcoords = np.zeros([nphosph,2])
         self.records = []
 
+        self.gridout = args.gridout
+        if args.gridout is None :
+            self.grid_low = None
+            self.grid_upp = None
+        else :
+            bounds = np.asarray([[0.0, 0.0, 0.0],self.processor.universe.dimensions[:3]])
+            self.grid_low = AnalysisGrid(bounds)
+            self.grid_upp = AnalysisGrid(bounds)
+            self.count_low = AnalysisGrid(bounds)
+            self.count_upp = AnalysisGrid(bounds)
+
     def process(self):
         """
         Calculate APL, VPL and accumulate density of phosphor selection
@@ -770,6 +887,27 @@ class MempropAnalysis(TrajectoryAction):
         self.sumcoords2 += self.phosphorsel.positions[:,:2]*self.phosphorsel.positions[:,:2]
         self.records.append(MDRecord(self.processor.currtime,[self.apllist[-1],self.vpllist[-1],self._calc_dhh(),self._calc_rmsf()]))
 
+        if self.grid_low is not None :
+
+            mid = self.phosphorsel.center_of_geometry()
+            sel_low = self.phosphorsel.positions[:,2] < mid[2]
+            sel_upp = np.logical_not(sel_low)
+            #print self.phosphorsel.positions.shape, sel_upp.shape
+            coords_upp = self.phosphorsel.positions[sel_upp,:]
+            coords_low = self.phosphorsel.positions[sel_low,:]
+            idx_low = self.grid_low.indices(coords_low-mid)
+            idx_upp = self.grid_upp.indices(coords_upp-mid)
+            try :
+                self.grid_low.matrix[idx_low[0], idx_low[1]] += self._calc_zdist(coords_low, coords_upp)
+                self.count_low.matrix[idx_low[0], idx_low[1]] += 1.0
+            except :
+                pass
+            try :
+                self.grid_upp.matrix[idx_upp[0], idx_upp[1]] += self._calc_zdist(coords_upp, coords_low)
+                self.count_upp.matrix[idx_upp[0], idx_upp[1]] += 1.0
+            except :
+                pass
+
     def finalize(self):
         """
         Calculate average APL and VPL as well as distance
@@ -782,6 +920,15 @@ class MempropAnalysis(TrajectoryAction):
         with open(self.out+".txt","w") as f :
             f.write("%.3f\t%.3f\t%.3f\t%.3f\n"%(apl, vpl, dhh, rmsf))
         self._write_records(postfix="_dt.txt")
+
+        if self.grid_low is not None :
+            sel = self.count_low.matrix>0.0
+            self.grid_low.matrix[sel] /= self.count_low.matrix[sel]
+            self.grid_low.write(self.gridout+"_low.dat")
+
+            sel = self.count_upp.matrix>0.0
+            self.grid_upp.matrix[sel] /= self.count_upp.matrix[sel]
+            self.grid_upp.write(self.gridout+"_upp.dat")
 
     def _calc_dhh(self) :
         mid = int(self.density.shape[0]/2)
@@ -796,6 +943,14 @@ class MempropAnalysis(TrajectoryAction):
         sumcoords2 = self.sumcoords2 / float(self.processor.nprocessed)
         var = sumcoords2 - (sumcoords * sumcoords)
         return var.sum(axis=1).mean()*0.01
+
+    def _calc_zdist(self, coords1, coords2) :
+        """
+        Calculate the z-distance between all lipids in one leaflet and the closest lipid in the other leaflet
+        """
+        dist = cdist(coords1[:,:2],coords2[:,:2],'sqeuclidean')
+        j = np.argmin(dist,axis=1)
+        return np.sqrt((coords2[j,2]-coords1[:,2])**2)*0.1
 
 class MemVoronoiAnalysis(TrajectoryAction) :
 
