@@ -242,8 +242,8 @@ class CenterWholeAlign(TrajectoryAction):
                 xyz = pbc.make_whole_xyz(self.protsel.positions,self.processor.currbox)
                 self.protsel.positions = xyz
             for res in self.residues :
-                xyz = pbc.make_whole_xyz(res.positions,self.processor.currbox)
-                res.positions = xyz
+                xyz = pbc.make_whole_xyz(res.atoms.positions,self.processor.currbox)
+                res.atoms.positions = xyz
         if not self.nocenter :
             self._center()
         if not self.noalign :

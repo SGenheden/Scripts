@@ -12,6 +12,7 @@ Examples:
 import argparse
 import inspect
 import sys
+import shlex
 
 from sgenlib import moldyn
 from sgenlib import mdactions
@@ -39,7 +40,7 @@ if __name__ == '__main__' :
     with open(processor.args.commands,"r") as f :
         for line in f.readlines():
             action = line.strip().split()[0].lower()
-            arguments = line.strip().split()[1:]
+            arguments = shlex.split(line.strip())[1:]
             try :
                 cls = actionclasses[action]
             except:
