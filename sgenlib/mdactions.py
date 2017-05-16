@@ -133,14 +133,16 @@ class AnalysisGrid(object) :
 
     Attributes
     ----------
+    count : NdArray
+        the number of times the accumulate function has been called
+    edgesx : NdArray
+        the edges along the x-dimension
+    edgesy : NdArray
+        the edges along the y-dimension
+    matrix : NdArray
+        the discretised data
     resolution : float
         the resolution, i.e. the size of each pixel
-    edgesx : NumpyArray
-        the edges along the x-dimension
-    edgesy : NumpyArray
-        the edges along the y-dimension
-    matrix : NumpyArray
-        the discretised data
     """
     def __init__(self, xyz, resolution=1.0) :
         xyz_shift = xyz - xyz.mean(axis=0)
@@ -151,6 +153,20 @@ class AnalysisGrid(object) :
                                     xyz_shift[:,1].max()+resolution, resolution)
         self.resolution = resolution
         self.matrix = np.zeros([self.edgesx.shape[0]+1, self.edgesy.shape[0]+1])
+        self.count = np.zeros([self.edgesx.shape[0]+1, self.edgesy.shape[0]+1])
+
+    def accumulate(self, positions, data) :
+
+        idx = self.indices(positions)
+        self.matrix[idx[0], idx[1]] += data
+        self.count[idx[0], idx[1]] += 1.0
+
+    def average(self, func=None) :
+
+        sel = self.count > 0.0
+        self.matrix[sel] /= self.count[sel]
+        if func is not None :
+            self.matrix[sel] = func(self.matrix[sel])
 
     def indices(self, positions) :
         """
@@ -400,15 +416,10 @@ class ChainOrderAnalysis(TrajectoryAction):
         self.records = []
 
         self.gridout = args.gridout
-        if args.gridout is None :
-            self.grid_low = None
-            self.grid_upp = None
-        else :
+        if self.gridout is not None :
             bounds = np.asarray([[0.0, 0.0, 0.0],self.processor.universe.dimensions[:3]])
             self.grid_low = AnalysisGrid(bounds)
             self.grid_upp = AnalysisGrid(bounds)
-            self.count_low = AnalysisGrid(bounds)
-            self.count_upp = AnalysisGrid(bounds)
 
     def process(self):
 
@@ -449,23 +460,13 @@ class ChainOrderAnalysis(TrajectoryAction):
         proj = np.multiply(vec,norm).sum(axis=1)**2 / np.sum(vec**2,axis=1)
 
         # Discretize on a grid
-        if self.grid_low is not None :
+        if self.gridout is not None :
             sel_low = a1[:, 2] < mid[2]
             sel_upp = np.logical_not(sel_low)
-            idx_low = self.grid_low.indices(a1[sel_low]-mid)
-            idx_upp = self.grid_upp.indices(a1[sel_upp]-mid)
-            try :
-                self.grid_low.matrix[idx_low[0], idx_low[1]] += proj[sel_low]
-                self.count_low.matrix[idx_low[0], idx_low[1]] += 1.0
-            except :
-                pass
-            try :
-                self.grid_upp.matrix[idx_upp[0], idx_upp[1]] += proj[sel_upp]
-                self.count_upp.matrix[idx_upp[0], idx_upp[1]] += 1.0
-            except :
-                pass
+            self.grid_low.accumulate(a1[sel_low]-mid, proj[sel_low])
+            self.grid_upp.accumulate(a1[sel_upp]-mid, proj[sel_upp])
 
-        # Order param
+        # return order parameter
         return np.abs(0.5*(3.0*proj.mean()-1))
 
     def finalize(self):
@@ -498,15 +499,12 @@ class ChainOrderAnalysis(TrajectoryAction):
                 f.write("Av\t%.3f\t%.3f\t"%(avs.mean(),avs.std()/np.sqrt(avs.shape[0])))
             f.write("\n")
 
-        if self.grid_low is not None :
-            sel = self.count_low.matrix>0.0
-            self.grid_low.matrix[sel] /= self.count_low.matrix[sel]
-            self.grid_low.matrix[sel] = np.abs(0.5*(3.0*self.grid_low.matrix[sel]-1))
+        if  self.gridout is not None :
+            def order(mat) :
+                return np.abs(0.5*(3.0*mat-1))
+            self.grid_low.average(func=order)
             self.grid_low.write(self.gridout+"_low.dat")
-
-            sel = self.count_upp.matrix>0.0
-            self.grid_upp.matrix[sel] /= self.count_upp.matrix[sel]
-            self.grid_upp.matrix[sel] = np.abs(0.5*(3.0*self.grid_upp.matrix[sel]-1))
+            self.grid_upp.average(func=order)
             self.grid_upp.write(self.gridout+"_upp.dat")
 
 class IredAnalysis(TrajectoryAction):
@@ -862,15 +860,10 @@ class MempropAnalysis(TrajectoryAction):
         self.records = []
 
         self.gridout = args.gridout
-        if args.gridout is None :
-            self.grid_low = None
-            self.grid_upp = None
-        else :
+        if self.gridout is not None :
             bounds = np.asarray([[0.0, 0.0, 0.0],self.processor.universe.dimensions[:3]])
             self.grid_low = AnalysisGrid(bounds)
             self.grid_upp = AnalysisGrid(bounds)
-            self.count_low = AnalysisGrid(bounds)
-            self.count_upp = AnalysisGrid(bounds)
 
     def process(self):
         """
@@ -887,26 +880,16 @@ class MempropAnalysis(TrajectoryAction):
         self.sumcoords2 += self.phosphorsel.positions[:,:2]*self.phosphorsel.positions[:,:2]
         self.records.append(MDRecord(self.processor.currtime,[self.apllist[-1],self.vpllist[-1],self._calc_dhh(),self._calc_rmsf()]))
 
-        if self.grid_low is not None :
-
+        if self.gridout is not None :
             mid = self.phosphorsel.center_of_geometry()
             sel_low = self.phosphorsel.positions[:,2] < mid[2]
             sel_upp = np.logical_not(sel_low)
-            #print self.phosphorsel.positions.shape, sel_upp.shape
             coords_upp = self.phosphorsel.positions[sel_upp,:]
             coords_low = self.phosphorsel.positions[sel_low,:]
-            idx_low = self.grid_low.indices(coords_low-mid)
-            idx_upp = self.grid_upp.indices(coords_upp-mid)
-            try :
-                self.grid_low.matrix[idx_low[0], idx_low[1]] += self._calc_zdist(coords_low, coords_upp)
-                self.count_low.matrix[idx_low[0], idx_low[1]] += 1.0
-            except :
-                pass
-            try :
-                self.grid_upp.matrix[idx_upp[0], idx_upp[1]] += self._calc_zdist(coords_upp, coords_low)
-                self.count_upp.matrix[idx_upp[0], idx_upp[1]] += 1.0
-            except :
-                pass
+            self.grid_low.accumulate(coords_low-mid,
+                                        self._calc_zdist(coords_low, coords_upp))
+            self.grid_upp.accumulate(coords_upp-mid,
+                                        self._calc_zdist(coords_upp, coords_low))
 
     def finalize(self):
         """
@@ -921,13 +904,10 @@ class MempropAnalysis(TrajectoryAction):
             f.write("%.3f\t%.3f\t%.3f\t%.3f\n"%(apl, vpl, dhh, rmsf))
         self._write_records(postfix="_dt.txt")
 
-        if self.grid_low is not None :
-            sel = self.count_low.matrix>0.0
-            self.grid_low.matrix[sel] /= self.count_low.matrix[sel]
+        if  self.gridout is not None:
+            self.grid_low.average()
             self.grid_low.write(self.gridout+"_low.dat")
-
-            sel = self.count_upp.matrix>0.0
-            self.grid_upp.matrix[sel] /= self.count_upp.matrix[sel]
+            self.grid_upp.average()
             self.grid_upp.write(self.gridout+"_upp.dat")
 
     def _calc_dhh(self) :

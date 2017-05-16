@@ -1,37 +1,40 @@
 # Author: Samuel Genheden, samuel.genheden@gmail.com
 
 """
-Program to plot 2D maps
+Program to plot 2D maps. The maps are named after the input files but
+with a "png"-extension.
+
+Example:
+    plot_2dmap.py -f grid_dhh_low.dat grid_dhh_upp.dat
 """
 
 import argparse
+import os
 
 import numpy as np
 import matplotlib.pylab as plt
 
-def _draw_2dmap(mat,filename) :
+from sgenlib import parsing
 
-  f = plt.figure()
-  im = f.gca().imshow(mat,cmap=plt.cm.YlGn,origin="lower")
-  sel = mat>0
-  excluded_im = np.ones([mat.shape[0],mat.shape[1],4])
-  excluded_im[sel,3] = 0.0
-  f.gca().imshow(excluded_im,origin="lower")
-  f.colorbar(im)
-  f.savefig(filename,format="png")
-  print filename
+def _draw_2dmap(mat, cutoff, filename) :
+
+    f = plt.figure()
+    sel = mat > cutoff
+    minval = np.min(mat[sel])
+    im = f.gca().imshow(mat, vmin=minval, cmap=plt.cm.RdYlBu,origin="lower")
+    excluded_im = np.ones([mat.shape[0],mat.shape[1],4])
+    excluded_im[sel,3] = 0.0
+    f.gca().imshow(excluded_im, origin="lower")
+    f.colorbar(im)
+    f.savefig(filename,format="png",dpi=300)
 
 if __name__ == '__main__' :
 
-  parser = argparse.ArgumentParser(description="Plotting 2D maps")
-  parser.add_argument('file',help="the npz file.")
-  parser.add_argument('-o','--out',help="a output prefix")
-  parser.add_argument('-m','--maps',nargs="+",help="the maps to plot")
-  args = parser.parse_args()
+    parser = argparse.ArgumentParser(description="Plotting 2D maps")
+    parser.add_argument('-f', '--file',nargs="+",help="the input file")
+    parser.add_argument('--cutoff', type=float, default=0.0, help="the cutoff for filtering")
+    args = parser.parse_args()
 
-  npzfile = np.load(args.file)
-  for m in args.maps :
-    if m in npzfile.files :
-      _draw_2dmap(npzfile[m],args.out+"_"+m+".png")
-    else :
-      print "Skipping %s"%m
+    for filename in args.file :
+        mat = parsing.parse2ndarray(filename)
+        _draw_2dmap(mat, args.cutoff, os.path.splitext(filename)[0]+".png")
