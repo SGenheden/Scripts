@@ -1,0 +1,7 @@
+[DOPC]
+chain1=C38 C39 C310 C311
+chain2=C28 C29 C210 C211
+
+[POP]
+chain1=
+chain2=C28 C29 C210 C211

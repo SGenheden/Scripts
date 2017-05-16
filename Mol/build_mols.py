@@ -1,15 +1,15 @@
 # Author: Samuel Genheden, samuel.genheden@gmail.com
 
 """
-Program to build molecules by looking up there SMILES string in 
-ChemSpider and then converting the SMILES to an xyz file. 
+Program to build molecules by looking up there SMILES string in
+ChemSpider and then converting the SMILES to an xyz file.
 
 The SPIDERKEY environmental variable needs to be set ChemSpider access key.
 
-If the molecule could not be found in ChemSpider the molecule name is 
+If the molecule could not be found in ChemSpider the molecule name is
 printed with a double exclamation mark (!!) appended.
 
-If the SMILES could not be converted successfully the molecule name is 
+If the SMILES could not be converted successfully the molecule name is
 printed with a single exclamation mark (!) appended.
 
 If multiple hits are found in ChemSpider the first one is converted

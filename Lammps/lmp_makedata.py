@@ -26,6 +26,7 @@ if __name__ == '__main__' :
   parser.add_argument('-b','--box',type=float,nargs=3,help="the box dimensions",default=[0.0,0.0,0.0])
   #parser.add_argument('-a','--atomistic',nargs="+",help="data file(s) for atomistic solutes",default=[])
   parser.add_argument('-c','--converter',help="the dictionary with conversion rules")
+  parser.add_argument('-k','--kind',help="the kind of particles", default="cg")
   #parser.add_argument('-p','--pairfunc',help="the pair function for the AA",default="lj/charmm/coul/long")
   args = parser.parse_args()
 
@@ -75,7 +76,7 @@ if __name__ == '__main__' :
 
   # Setting correct type for all atoms
   for atom in data.atoms :
-    atom.kind = "cg"
+    atom.kind = args.kind
 
   # Settings the correct number of atom and connectivity types
   data.atomtypes = [None]*len(include.masses)

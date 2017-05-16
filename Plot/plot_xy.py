@@ -43,12 +43,13 @@ if __name__ == '__main__' :
     parser.add_argument('--correlation', action="store_true",help="turn on correlation line",default=False)
     parser.add_argument('--noyticks', action="store_true",help="turn on no y-ticks",default=False)
     parser.add_argument('--histogram', type=int, help="turn on plotting of histogram")
+    parser.add_argument('--dotstyle', help="style for individual dots on the line",default="")
     args = parser.parse_args()
 
     if len(args.file) > 2 :
         args.twin = False
 
-    defaultstyle = "." if args.scatter else "-"
+    defaultstyle = "." if args.scatter else "-"+args.dotstyle
 
     if args.squared or args.correlation :
         f = plt.figure(figsize=(2.5,2.5))
@@ -105,7 +106,7 @@ if __name__ == '__main__' :
             yerr = data[n:,args.ycol+1]*args.yfactor
             plt.fill_between(x,y-yerr,y+yerr, facecolor='grey',linewidth=0,alpha=0.4,interpolate=True)
         if args.equil :
-            equili = series.find_equilibration(x,y)
+            equili = series.find_equilibration(x,y, atleast=10)
             print "%s equilibrated at %.3f"%(label,x[equili])
 
     if len(args.file) == 2 and args.twin :

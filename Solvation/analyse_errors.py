@@ -57,7 +57,7 @@ def _bedroc_analytic(npos,ntot):
     denom2 = 1 - np.exp(-nneg)
     return (num1/denom1)-(nneg / denom2)
 
-def _bootstrap_bedroc(data,nboots=500):
+def _bootstrap_bedroc(data,nboots=50):
     bedrocs = np.zeros(nboots)
     for i in range(nboots):
         while True:
@@ -76,9 +76,19 @@ if __name__ == '__main__':
     argparser.add_argument('-xls','--xls',help="the filename of the XLS file")
     argparser.add_argument('-solvents','--solvents',nargs="+",help="the solvents in the XLS file to analyse")
     argparser.add_argument('--noboxplots',action="store_true",default=False,help="turn off creation of boxplots")
+    argparser.add_argument('-postfix','--postfix',help="the sheet name postfix",default="")
+    argparser.add_argument('-groupname','--groupname',help="the sheet name postfix",default=".groups")
+    argparser.add_argument('-supergroups','--supergroups',help="the super groups")
     args = argparser.parse_args()
 
     db = dblib.SolvDb(filename=args.db,type="abs",filehandle="^0")
+
+    if args.supergroups is not None :
+        with open(args.supergroups, "r") as f :
+            supergroups = [line.strip() for line in f.readlines()]
+        print supergroups
+    else :
+        supergroups = dblib.supergroups
 
     wb = None
     try :
@@ -90,7 +100,7 @@ if __name__ == '__main__':
     sheets = []
     for solvent in args.solvents:
         try :
-            postfix = '' if solvent == 'water' else '_e09'
+            postfix = args.postfix if solvent == 'water' else 'water'+args.postfix
             ws = wb['raw_'+solvent+postfix]
         except :
             raise Exception("Unable to find sheet for solvent%s"%solvent)
@@ -122,23 +132,24 @@ if __name__ == '__main__':
 
     # Do analysis of chemical groups
     print ""
-    statslist = {group:[] for group in dblib.supergroups}
+    statslist = {group:[] for group in supergroups}
     GroupStatData = \
         namedtuple("GroupStatData",["value","mean","std","analytic","pvalue","mse","n"])
     for solvent,sheet,errors in zip(args.solvents,sheets,errorlist):
         solutes = _extract_solutes(sheet)
         signederrors = _extract_signederrors(sheet)
-        entries = [entry for entry in db.itersolutelist(solvent,solutes)]
+        entries = [entry for entry in db.itersolutelist(solvent if solvent != 'waterpol' else 'water',solutes)]
         ntrue = sum([entry.SoluteName==solute for entry,solute in zip(entries,solutes)])
         if ntrue != len(solutes) :
             raise Exception("Internal error!")
         solgroups = []
         for entry in entries:
-            with open(os.path.join(args.soldir,"%s.groups"%entry.FileHandle),"r") as f :
-                groups = [line.strip() for line in f.readlines()]
-            groups = dblib.transform_groups(groups,entry)
+            with open(os.path.join(args.soldir,"%s%s"%(entry.FileHandle, args.groupname)),"r") as f :
+                groups = [line.strip().split(":")[0] for line in f.readlines()]
+            if args.supergroups is  None:
+                groups = dblib.transform_groups(groups,entry)
             solgroups.append(groups)
-        for group in dblib.supergroups:
+        for group in supergroups:
             scoreddata = croc.ScoredData()
             bootdata = np.zeros((errors.shape[0],2))
             for i,(error,solgroup) in enumerate(zip(errors,solgroups)):
@@ -166,7 +177,7 @@ if __name__ == '__main__':
         ws = wb['groupanal']
     except :
         ws = wb.create_sheet(title='groupanal')
-    rowoffset = len(dblib.supergroups)+2
+    rowoffset = len(supergroups)+2
 
     ws['A1'] = 'Group'
     ws.cell(row=rowoffset+1,column=1).value = 'Analytical BEDROC'
@@ -181,7 +192,7 @@ if __name__ == '__main__':
         if i == len(args.solvents)-1:
             lastcol = ws.cell(row=1,column=i*2+2).column
 
-    for i,group in enumerate(dblib.supergroups,2):
+    for i,group in enumerate(supergroups,2):
         ws.cell(row=i,column=1).value = group
         for m in range(1,5):
             ws.cell(row=i+rowoffset*m,column=1).value = group
@@ -194,13 +205,13 @@ if __name__ == '__main__':
             ws.cell(row=i+rowoffset*2,column=j*2+2).value = stats.pvalue
             ws.cell(row=i+rowoffset*3,column=j*2+2).value = stats.mse
             ws.cell(row=i+rowoffset*4,column=j*2+2).value = stats.n
-    ws.conditional_formatting.add(
+    """ws.conditional_formatting.add(
         "B%d:%s%d"%(2,lastcol,1+len(dblib.supergroups)),
         xl.formatting.CellIsRule(operator='greaterThan', formula=['0.5'],
         font=xl.styles.Font(bold=True)))
     ws.conditional_formatting.add(
         "B%d:%s%d"%(rowoffset*2+2,lastcol,rowoffset*2+1+len(dblib.supergroups)),
         xl.formatting.CellIsRule(operator='lessThan', formula=['0.05'],
-        font=xl.styles.Font(bold=True)))
+        font=xl.styles.Font(bold=True)))"""
 
     wb.save(args.xls)

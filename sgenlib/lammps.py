@@ -132,6 +132,12 @@ class Atom :
     the y-component of the periodic box specification
   iy : integer
     the z-component of the periodic box specification
+  fx : float
+    the x-component of the force
+  fy : float
+    the y-component of the force
+  fz : float
+    the z-component of the force
   """
   def __init__(self,record=None) :
     self.idx = 0
@@ -1090,7 +1096,7 @@ class DumpFile :
         line = f.readline()
       f.close()
 
-    print "Extracting snapshot %d \nReading: "%snapshot,
+    #print "Extracting snapshot %d \nReading: "%snapshot,
     f = open(filename,"r")
     line = f.readline()
     n = 0
@@ -1132,10 +1138,12 @@ class DumpFile :
           break
       line = f.readline()
     f.close()
-    print ""
+    #print ""
 
     self.datafile.box = box
-    for i,(dataatom,dumpatom) in enumerate(zip(self.datafile.atoms,atoms)) :
+    for dumpatom in atoms :
+      idx = int(dumpatom[0])
+      dataatom = self.datafile.atoms[idx-1]
       for key,val in zip(keys,dumpatom) :
         if key == "x" :
           dataatom.x = float(val)
@@ -1155,6 +1163,12 @@ class DumpFile :
           dataatom.iy = int(val)
         elif key == "iz" :
           dataatom.iz = int(val)
+        elif key == "fx" :
+          dataatom.fx = float(val)
+        elif key == "fy" :
+          dataatom.fy = float(val)
+        elif key == "fz" :
+          dataatom.fz = float(val)
 
 
 class ResidueConverter :

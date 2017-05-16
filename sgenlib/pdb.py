@@ -496,6 +496,8 @@ class Atom :
     the Cartesian coordinates
   hidden : boolean
     indicates if this should be written to file
+  pqratom : boolean
+    indicates if this should be written in a free-format
   """
   def __init__(self,idx=None,record=None) :
     self.idx = idx
@@ -515,6 +517,7 @@ class Atom :
     self.term = ""
     self.xyz = None
     self.hidden = False
+    self.pqratom = False
     if record :
       self.readRecord(record)
 
@@ -539,7 +542,10 @@ class Atom :
       serial = self.serial - 99999
     else :
       serial = self.serial
-    return "%6s%5d %4s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f%s"%(record[self.hetatm],serial,name,self.altloc,resname,self.chain,resnr,self.insertion,self.x,self.y,self.z,self.occupancy,self.bfactor,self.term)
+    if not self.pqratom :
+        return "%6s%5d %4s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f%s"%(record[self.hetatm],serial,name,self.altloc,resname,self.chain,resnr,self.insertion,self.x,self.y,self.z,self.occupancy,self.bfactor,self.term)
+    else :
+        return "%6s%5d %4s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%8.4f%8.4f%s"%("ATOM  ",serial,name,self.altloc,resname,self.chain,resnr,self.insertion,self.x,self.y,self.z,self.occupancy,self.bfactor,self.term)
 
   def readGRO(self,record) :
     """

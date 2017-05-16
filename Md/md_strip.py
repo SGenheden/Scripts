@@ -4,7 +4,7 @@
 Program to strip atoms from a trajectory
 
 Examples:
-md_rmsd.py -f md2_whole.xtc -s md1.gro --sel "name SOL"
+md_strip.py -f md2_whole.xtc -s md1.gro --sel "name SOL"
 """
 
 from sgenlib import moldyn
