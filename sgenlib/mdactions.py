@@ -298,6 +298,8 @@ class ChainOrderAnalysis(TrajectoryAction):
         parser.add_argument('--analysis',choices=["CC","CH"], help="the type of analysis C-C or C-H", default="CC")
         parser.add_argument('--groups', help="group definitions for pseudo-atom calculation")
         parser.add_argument('--gridout', help="the prefix for the filename of a 2D grid")
+        parser.add_argument('--protmask',help="the selectiom mask for lipid residues")
+        parser.add_argument('--pmask',help="the selectiom mask for phosphor atoms",default="name P")
         parser.add_argument('-o', '--out', help="the output prefix", default="order")
 
     def setup(self, args):
@@ -416,18 +418,31 @@ class ChainOrderAnalysis(TrajectoryAction):
         self.records = []
 
         self.gridout = args.gridout
+        self.phosphorsel = None
         if self.gridout is not None :
             bounds = np.asarray([[0.0, 0.0, 0.0],self.processor.universe.dimensions[:3]])
             self.grid_low = AnalysisGrid(bounds)
             self.grid_upp = AnalysisGrid(bounds)
+            self.phosphorsel = self.processor.universe.select_atoms(args.pmask)
+            if args.protmask is not None :
+                self.protsel = self.processor.universe.select_atoms(args.protmask)
+                self.grid_prot = AnalysisGrid(bounds)
+                self.protone = np.ones(len(self.protsel))
+            else :
+                self.protsel = None
 
     def process(self):
+
+        mid = None
+        if self.gridout is not None :
+            mid = self.phosphorsel.center_of_geometry()
+            if self.protsel is not None :
+                self.grid_prot.accumulate(self.protsel.positions-mid, self.protone)
 
         orders = []
         if self.analtype == "CC":
             if self.resgroups is None:
                 for selection in self.selections :
-                    mid = selection[0].center_of_geometry()
                     for a1, a2 in zip(selection[:-1],selection[1:]):
                         orders.append(self._calc_order(a1.positions,
                                         a2.positions, self.normal, mid))
@@ -439,7 +454,6 @@ class ChainOrderAnalysis(TrajectoryAction):
                     if self.processor.nprocessed == 1:
                         for pos in xyz:
                             f.write("c %.3f %.3f %.3f\n"%(pos[0], pos[1], pos[2]))
-                    mid = xyz[selection.indices[0]].mean(axis=0)
                     for i1, i2 in zip(selection.indices[:-1], selection.indices[1:]):
                         orders.append(self._calc_order(xyz[i1,:],
                                         xyz[i2,:], self.normal, mid))
@@ -447,7 +461,6 @@ class ChainOrderAnalysis(TrajectoryAction):
                     f.close()
         elif self.analtype == "CH":
             for cselection, hselection in zip(self.selections, self.hselections):
-                mid = cselection[0].center_of_geometry()
                 for a1, a2 in zip(cselection, hselection):
                     orders.append(self._calc_order(a1.positions,
                                     a2.positions, self.normal, mid))
@@ -461,10 +474,12 @@ class ChainOrderAnalysis(TrajectoryAction):
 
         # Discretize on a grid
         if self.gridout is not None :
-            sel_low = a1[:, 2] < mid[2]
+            sel_low = self.phosphorsel.positions[:,2] < mid[2]
             sel_upp = np.logical_not(sel_low)
-            self.grid_low.accumulate(a1[sel_low]-mid, proj[sel_low])
-            self.grid_upp.accumulate(a1[sel_upp]-mid, proj[sel_upp])
+            coords_upp = self.phosphorsel.positions[sel_upp,:]
+            coords_low = self.phosphorsel.positions[sel_low,:]
+            self.grid_low.accumulate(coords_low-mid, proj[sel_low])
+            self.grid_upp.accumulate(coords_upp-mid, proj[sel_upp])
 
         # return order parameter
         return np.abs(0.5*(3.0*proj.mean()-1))
@@ -506,6 +521,9 @@ class ChainOrderAnalysis(TrajectoryAction):
             self.grid_low.write(self.gridout+"_low.dat")
             self.grid_upp.average(func=order)
             self.grid_upp.write(self.gridout+"_upp.dat")
+            if self.protsel is not None :
+                self.grid_prot.average()
+                self.grid_prot.write(self.gridout+"_prot.dat")
 
 class IredAnalysis(TrajectoryAction):
     """
@@ -833,6 +851,7 @@ class MempropAnalysis(TrajectoryAction):
         parser.add_argument('--watmask',help="the selectiom mask for water residues",default="resname SOL")
         parser.add_argument('--watvol',type=float,help="the volume of a water molecule in nm3",default=0.0306)
         parser.add_argument('--gridout', help="the prefix for the filename of a 2D grid")
+        parser.add_argument('--protmask',help="the selectiom mask for lipid residues")
         parser.add_argument('-o','--out',help="the output prefix",default="memprop")
 
     def setup(self,args):
@@ -864,6 +883,12 @@ class MempropAnalysis(TrajectoryAction):
             bounds = np.asarray([[0.0, 0.0, 0.0],self.processor.universe.dimensions[:3]])
             self.grid_low = AnalysisGrid(bounds)
             self.grid_upp = AnalysisGrid(bounds)
+            if args.protmask is not None :
+                self.protsel = self.processor.universe.select_atoms(args.protmask)
+                self.grid_prot = AnalysisGrid(bounds)
+                self.protone = np.ones(len(self.protsel))
+            else :
+                self.protsel = None
 
     def process(self):
         """
@@ -890,6 +915,8 @@ class MempropAnalysis(TrajectoryAction):
                                         self._calc_zdist(coords_low, coords_upp))
             self.grid_upp.accumulate(coords_upp-mid,
                                         self._calc_zdist(coords_upp, coords_low))
+            if self.protsel is not None :
+                self.grid_prot.accumulate(self.protsel.positions-mid, self.protone)
 
     def finalize(self):
         """
@@ -909,6 +936,9 @@ class MempropAnalysis(TrajectoryAction):
             self.grid_low.write(self.gridout+"_low.dat")
             self.grid_upp.average()
             self.grid_upp.write(self.gridout+"_upp.dat")
+            if self.protsel is not None :
+                self.grid_prot.average()
+                self.grid_prot.write(self.gridout+"_prot.dat")
 
     def _calc_dhh(self) :
         mid = int(self.density.shape[0]/2)
