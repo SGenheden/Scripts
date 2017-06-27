@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser.add_argument('-c','--centers',type=float,nargs="+",help="the centers of the simulations in Angstromgs",default=[])
     parser.add_argument('-m','--md',choices=["gmx","lammps","gmx_plumed"],help="the MD engine, should be either 'gmx' or 'lammps'",default="gmx")
     parser.add_argument('-o','--out',help="the prefix for the output",default="pmf")
-    parser.add_argument('-w','--weight',type=float,help="the force constant used in the simulation",default=0.0)
+    parser.add_argument('-w','--weight',nargs="+", type=float,help="the force constant used in the simulation",default=[0.0])
     parser.add_argument('--temp',type=float,help="the temperature used in the simulation",default=300.0)
     parser.add_argument('--range',type=float,nargs="+",help="the range of the histograms")
     parser.add_argument('--nbins',type=int,help="the number of bins of the histogram",default=200)
@@ -31,9 +31,12 @@ if __name__ == '__main__':
         quit()
 
 
-    weight = args.weight
+    if len(args.weight) == 1 :
+        weights = np.asarray([args.weight]*len(args.files))
+    else :
+        weights = np.asarray(args.weight)
     if args.md in ["gmx_plumed","gmx"] : # Convert Gromacs weight to kcal/mol/A2
-        weight = weight/4.184/100.0
+        weights = weights/4.184/100.0
 
     nskip = args.skip
     if args.skip == 0 and args.blocks > 1 :
@@ -53,7 +56,7 @@ if __name__ == '__main__':
 
 
     # Split distance files into blocks
-    for i, (filename, center) in enumerate(zip(args.files,args.centers)) :
+    for i, (filename, center, weight) in enumerate(zip(args.files,args.centers, weights)) :
         results = results_class(center,weight,filename=filename,stride=args.stride)
         if args.shorten > 0 : results.shorten(args.shorten)
         results.skip(nskip)
