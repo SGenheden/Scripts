@@ -27,7 +27,7 @@ if __name__ == '__main__' :
     parser.add_argument('-b','--box',help="the membrane box")
     parser.add_argument('-o','--out',help="the output file",default="inserted")
     parser.add_argument('-z','--zvals',nargs="+",type=float,help="the position in the z-direction")
-    parser.add_argument('-p','--patom',help="the name of the phosphate atom", default="P")
+    parser.add_argument('-p','--patom',help="the name of the phosphate atom")
     parser.add_argument('-n','--nxy',type=int,help="the index of a previously employed xy-position")
     args = parser.parse_args()
 
@@ -54,6 +54,11 @@ if __name__ == '__main__' :
     boxfile.extend(solutefile2)
 
     # Calculate the center of membrane
+    if args.patom is None :
+        args.patom = "P"
+        if len([atom for atom in boxfile.atoms
+                if atom.name.strip() == args.patom]) == 0 :
+            args.patom = "PO4"
     memz = []
     for atom in boxfile.atoms :
         if atom.name.strip() == args.patom :
