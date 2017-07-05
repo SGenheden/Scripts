@@ -14,8 +14,11 @@ indicating scaling epsilon, sigma (vdW parameters) or Coulomb potential.
 
 The default output is the input include file with a "_scaled" string appended
 
-Example (standard scaling in hybrid simulation) :
+Example:
+ (standard scaling in hybrid membrane simulation)
   scale_elba_pairs.py forcefield.elba_toluene -b 2,3 4,5 -s 0.5 1.75 -p e c
+  (standard scaling in hybrid liquid simulation)
+  scale_elba_pairs.py forcefield.elba_toluene -b 6 -s 0.9 -p e
 """
 
 import argparse

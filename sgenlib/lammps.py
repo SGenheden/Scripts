@@ -1231,7 +1231,7 @@ class ResidueConverter :
             counts[cg_name] = counts[cg_name] + 1
 
       for cg_name in self.cg_names :
-        if counts[cg_name] != len(self.aa_names[cg_name]) :
+        if counts[cg_name] != len(self.aa_names[cg_name]) and cg_name is not "w" :
           print "Could not find all atoms for %s (%d %d)"%(cg_name,counts[cg_name],len(self.aa_names[cg_name]))
 
     else :

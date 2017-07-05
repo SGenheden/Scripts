@@ -1,7 +1,20 @@
 [wat]
 names = w
-w_names = oh2
+w_names = oh2 ow
 w_create = %%d    1    %%10.4f %%10.4f %%10.4f    %%d   0.00   0.53449   0.02447   0.08219  3.0  2.7
+
+[oct]
+names = o1 t1a t2a t3a
+o1_names = o1 c8
+o1_create = %%d    1    %%10.4f %%10.4f %%10.4f    %%d   0.00   0.53449   0.02447   0.08219  3.0  2.7
+t1a_names = c7 c6 c5
+t1a_create = %%d    6     %%10.4f %%10.4f %%10.4f      %%d   0.00   0.00000   0.00000   0.00000  4.5  0.9
+t2a_names = c5 c4 c3
+t2a_create = %%d    6     %%10.4f %%10.4f %%10.4f      %%d   0.00   0.00000   0.00000   0.00000  4.5  0.9
+t3a_names = c3 c2 c1
+t3a_create = %%d    6     %%10.4f %%10.4f %%10.4f      %%d   0.00   0.00000   0.00000   0.00000  4.5  0.9
+bonds=5,1,2 5,2,3 5,3,4
+angles=3,1,2,3 3,2,3,4
 
 [dmp]
 names = n p g e1 t1a t2a t3a t4a e2 t1b t2b t3b t4b
