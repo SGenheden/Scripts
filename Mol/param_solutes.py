@@ -13,12 +13,7 @@ import string
 
 import numpy as np
 import MDAnalysis as md
-# Trying to import parmed
-hasparmed = True
-try :
-    import parmed
-except :
-    hasparmed = False
+import parmed
 
 from sgenlib import ambertools
 
@@ -56,16 +51,27 @@ def _write_pdb(xyzname, resname) :
 
     bname = os.path.basename(xyzname)
 
-    # Read it in to a MDAnalysis universe
-    reader = md.Universe(bname,bname)
-    for i,atom in enumerate(reader.select_atoms("all"),1) :
-        atom.resname = resname
-        atom.name = atom.name+"%d"%i
+    lines = []
+    with open(xyzname, "r") as f :
+        lines = f.readlines()[2:]
 
-    # Write it out as a pdb
-    writer = md.coordinates.PDB.PDBWriter(os.path.splitext(bname)[0]+".pdb", universe=reader)
-    writer.write(reader.trajectory.ts)
-    writer.close()
+    s = parmed.Structure()
+    r = parmed.Residue(name=resname, number=1, list=s.residues)
+    s.residues.append(r)
+
+    for i, atom_line in enumerate(lines, 1) :
+        data = atom_line.strip().split()
+        a = parmed.Atom(list=s.atoms,
+                            atomic_number=parmed.periodic_table.AtomicNum[data[0]],
+                            name=data[0]+"%d"%i)
+        a.number = i
+        a.xx = float(data[1])
+        a.xy = float(data[2])
+        a.xz = float(data[3])
+        r.add_atom(a)
+        s.atoms.append(a)
+
+    s.write_pdb(os.path.splitext(bname)[0]+".pdb")
 
 if __name__ == '__main__':
 
@@ -98,8 +104,7 @@ if __name__ == '__main__':
                 with open("leapcom","w") as f :
                     f.write(leapcmd%tuple([solute]*6))
                 ambertools.run_program("tleap","tleap -f leapcom")
-                if hasparmed :
-                    _write_gro(solute)
+                _write_gro(solute)
             if not args.noclean  :
                 os.remove(solute+".pdb") # Remove unnecessary pdb file
             if not os.path.exists(solute+".prepi"): print "**"

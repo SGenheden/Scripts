@@ -198,7 +198,7 @@ class MoleculeType :
 
     while lines[lineidx][0] == ";" or len(lines[lineidx])  < 2 : lineidx = lineidx + 1
     self.name = lines[lineidx].strip().split()[0]
-
+    
     while lineidx < len(lines) and lines[lineidx].find("[ moleculetype ]") == -1 :
       if lines[lineidx].find("[ atoms ]") > -1 or lines[lineidx].find("[atoms]") > -1:
         lineidx = self.__read_atoms(lines,lineidx+1)

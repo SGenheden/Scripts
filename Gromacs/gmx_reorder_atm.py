@@ -41,7 +41,7 @@ if __name__ == "__main__":
       tlen = reslen[res.resname.strip()]
       if slen != tlen :
         if slen % tlen != 0 :
-          raise Exception("Found a residue with incompatible length (%s, %s)"%(tlen,slen))
+          raise Exception("Found a residue with incompatible length (%s, %s, %s)"%(tlen,slen,res.resname))
         else :
           pdbfile.split_residue(i,slen/tlen)
 

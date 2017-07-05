@@ -56,3 +56,5 @@ docs/_build/
 Deprecated/*
 Proj-fragments/*
 Proj-inla/*
+.ipynb_checkpoints/*
+Gmm/*
