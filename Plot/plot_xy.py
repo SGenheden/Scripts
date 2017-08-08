@@ -20,7 +20,7 @@ if __name__ == '__main__' :
     parser.add_argument('-l','--label',nargs="+",help="the labels")
     parser.add_argument('-o','--out',help="the output filename",default="xy.png")
     parser.add_argument('-s','--skip',type=float,help="how much to discard",default=0.0)
-    parser.add_argument('--stride',type=float,help="how much to stride",)
+    parser.add_argument('--stride',type=int,help="how much to stride",)
     parser.add_argument('--xcol',type=int,help="the column of the x-data",default=0)
     parser.add_argument('--ycol',type=int,help="the column of the y-data",default=1)
     parser.add_argument('--multicol',nargs="+",type=int,help="the column of the y-data")
@@ -56,7 +56,7 @@ if __name__ == '__main__' :
         a = f.add_axes((0.2,0.2,0.75,0.75))
     else :
         f = plt.figure(figsize=(3.33,2.5))
-        a = f.add_axes((0.15,0.2,0.75,0.75))
+        a = f.add_axes((0.20,0.2,0.75,0.75))
     plotax = [a]*len(args.file)
     if args.twin : plotax[1] = a.twinx()
 
