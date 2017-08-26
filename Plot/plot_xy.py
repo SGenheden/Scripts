@@ -8,6 +8,8 @@ import argparse
 
 import numpy as np
 import matplotlib.pylab as plt
+import matplotlib.lines as mlines
+import matplotlib.transforms as transforms
 
 from sgenlib import colors
 from sgenlib import parsing
@@ -44,6 +46,7 @@ if __name__ == '__main__' :
     parser.add_argument('--noyticks', action="store_true",help="turn on no y-ticks",default=False)
     parser.add_argument('--histogram', type=int, help="turn on plotting of histogram")
     parser.add_argument('--dotstyle', help="style for individual dots on the line",default="")
+    parser.add_argument('--xmarkers', help="put markers for the x-axis at the top of the graph")
     args = parser.parse_args()
 
     if len(args.file) > 2 :
@@ -53,10 +56,10 @@ if __name__ == '__main__' :
 
     if args.squared or args.correlation :
         f = plt.figure(figsize=(2.5,2.5))
-        a = f.add_axes((0.2,0.2,0.75,0.75))
+        a = f.add_axes((0.19,0.19,0.74,0.74))
     else :
         f = plt.figure(figsize=(3.33,2.5))
-        a = f.add_axes((0.20,0.2,0.75,0.75))
+        a = f.add_axes((0.19,0.19,0.74,0.74))
     plotax = [a]*len(args.file)
     if args.twin : plotax[1] = a.twinx()
 
@@ -142,4 +145,25 @@ if __name__ == '__main__' :
         a.set_ylim(ylim)
         a.set_xlim(ylim)
         a.set_aspect('equal')
+
+    if args.xmarkers is not None :
+        # Add a thin line to span the entire axis
+        line = mlines.Line2D([0, 1], [1.02, 1.02], lw=1., color='k', clip_on=False, transform=a.transAxes)
+        a.add_line(line)
+        # Transformation to use x-coordinate in data coordinates, and
+        # y-coordinate in axis coordinates
+        trans = transforms.blended_transform_factory(a.transData, a.transAxes)
+        # Add a bold line to marke a specific range of the x-axis
+        with open(args.xmarkers, "r") as xfile :
+            for line in xfile.readlines() :
+                start, stop, lbl = line.strip().split()
+                coord = map(float, [start, stop])
+                # Bold line
+                line = mlines.Line2D(coord, [1.02, 1.02], lw=3., color='k',
+                                        clip_on=False, transform=trans)
+                a.add_line(line)
+                # Label
+                a.text(np.mean(coord), 1.04, lbl, fontsize=6,
+                        horizontalalignment='center', transform=trans)
+
     f.savefig(args.out,format="png",dpi=300)
