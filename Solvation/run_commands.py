@@ -27,8 +27,15 @@ if __name__ == '__main__':
     commands = [s.strip() for s in open(args.commands,'r').readlines()]
 
     # Loop over all the database entries in the solute lists
+    nerrors = 0
     for i,entry in enumerate(db.itersolutelist(args.solvent,solutes)):
         for cmd in commands :
             if i == 0 : print cmd.replace("$$",entry.FileHandle)
-            ambertools.run_program("cmd",cmd.replace("$$",entry.FileHandle))
-        print entry.SoluteName
+            try :
+                ambertools.run_program("cmd",cmd.replace("$$",entry.FileHandle))
+            except :
+                print "!",
+                nerrors += 1;
+        if nerrors > 10 :
+            raise Exception("Too many errors!")
+        print entry.SoluteName, entry.FileHandle
