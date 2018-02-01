@@ -1,3 +1,14 @@
+# Author: Samuel Genheden samuel.genheden@gmail.com
+
+"""
+Program to perform hydrogen mass repartitioning of a Gromacs topology file
+
+Used in membrane engineering project
+
+Examples
+--------
+gmx_hmassrepart.py -f dopc.top -o dopc_heavyh.itp
+"""
 import argparse
 import os
 import sys
@@ -6,7 +17,7 @@ import parmed
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description="Program sort a structure file according to topology")
+    parser = argparse.ArgumentParser(description="Program to do mass repartitioning")
     parser.add_argument('-f','--file',help="the input top-file")
     parser.add_argument('-o','--out',help="the output top-file",default="hmassrepart.top")
     parser.add_argument('-m','--mass', type=float, help="the new hydrogen mass", default=4.032)
