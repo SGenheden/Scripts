@@ -45,14 +45,14 @@ if __name__ == '__main__' :
     parser.add_argument('--correlation', action="store_true",help="turn on correlation line",default=False)
     parser.add_argument('--noyticks', action="store_true",help="turn on no y-ticks",default=False)
     parser.add_argument('--histogram', type=int, help="turn on plotting of histogram")
-    parser.add_argument('--dotstyle', help="style for individual dots on the line",default="")
+    parser.add_argument('--dotstyle', nargs="+",help="style for individual dots on the line")
     parser.add_argument('--xmarkers', help="put markers for the x-axis at the top of the graph")
     args = parser.parse_args()
 
     if len(args.file) > 2 :
         args.twin = False
 
-    defaultstyle = "." if args.scatter else "-"+args.dotstyle
+    defaultstyle = "." if args.scatter else "-"
 
     if args.squared or args.correlation :
         f = plt.figure(figsize=(2.5,2.5))
@@ -97,6 +97,8 @@ if __name__ == '__main__' :
             y, x = np.histogram(y, bins=args.histogram)
             x = 0.5 * (x[:-1] + x[1:])
         stl = defaultstyle if args.nostyle else colors.style(i)
+        if args.nostyle and args.dotstyle :
+            stl += args.dotstyle[min(i,len(args.dotstyle)-1)]
         ln = axis.plot(x,y, stl,color=colors.color(i),label=label)
 
         ylim[0] = min(ylim[0], y.min())

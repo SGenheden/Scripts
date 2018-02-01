@@ -980,8 +980,12 @@ class ExternalWham(Wham) :
     freefile = "%s/wham_free"%tempfolder
     logfile  = "%s/wham_log"%tempfolder
 
-    whamcommand = "%s %.4f %.4f %d %.0E %.2f 0 %s %s >& %s"%(whamprog,self.bins[0],self.bins[-1],self.bins.shape[0]-1,tolerance,self.temperature,metafile,freefile,logfile)
-    subprocess.call(whamcommand,shell=True)
+    #whamcommand = "%s %.4f %.4f %d %.0E %.2f 0 %s %s >& %s"%(whamprog,self.bins[0],self.bins[-1],self.bins.shape[0]-1,tolerance,self.temperature,metafile,freefile,logfile)
+    #subprocess.call(whamcommand,shell=True)
+
+    whamcommand = "%s %.4f %.4f %d %.0E %.2f 0 %s %s"%(whamprog,self.bins[0],self.bins[-1],self.bins.shape[0]-1,tolerance,self.temperature,metafile,freefile)
+    with open(logfile, "w") as f:
+        subprocess.call(whamcommand,shell=True, stdout=f, stderr=f)
 
     self._extract_output(freefile)
 

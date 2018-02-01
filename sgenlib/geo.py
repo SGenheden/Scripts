@@ -97,7 +97,11 @@ def dihedral(a1,a2,a3,a4) :
   v3 = a4 - a3
   n1 = np.cross(v1,v2)
   n2 = np.cross(v2,v3)
-  return angle(n1,n2)
+  if np.dot(v3, np.cross(v1, v2)) <= 0.0 :
+    return -angle(n1,n2)
+  else :
+    return angle(n1,n2)
+
 
 def dihedral_protoms(a1,a2,a3,a4) :
   """
@@ -119,7 +123,6 @@ def dihedral_protoms(a1,a2,a3,a4) :
     phi = -1
 
   phi = np.arccos(phi)
-
   n3 = vnorm(np.cross(n1,v23))
   ang = np.dot(n2,n3)
   if ang > 1.0 :

@@ -4,6 +4,7 @@
 Routines to perform analysis on series
 """
 
+import numpy as np
 from scipy.stats import spearmanr
 
 def find_equilibration(x,y,atleast=50,threshold=0.05,nperm=0) :
@@ -40,3 +41,40 @@ def find_equilibration(x,y,atleast=50,threshold=0.05,nperm=0) :
       ncnt = (rho0*rho0 < rhos*rhos).sum()
       if float(ncnt) / float(nperm) > threshold : return i
   return y.shape[0]-atleast
+
+def standard_error(y) :
+    """
+    Find the standard error of a time series by block averaging
+
+    Parameters
+    ----------
+    y : ndarray
+        the y data
+
+    Returns
+    -------
+    float
+      the standard error
+    """
+    def _factors(n):
+        # Return list of integer factors
+        factor = []
+        sqrt = int(round(np.sqrt(n) + 0.5))
+        i = 1
+        while i <= sqrt:
+            if n % i == 0:
+                factor.append(i)
+                j = n / i
+                if j != i:
+                    factor.append(j)
+            i += 1
+        return sorted(factor, key=int)
+
+    n = y.shape[0]
+    std_max = 0.0
+    for fac in _factors(n)[:-2] :
+        blocks = y.reshape((-1, fac))
+        block_av =  blocks.mean(axis=1)
+        std = np.std(block_av, ddof=0) / np.sqrt(blocks.shape[0] - 1)
+        std_max = max(std, std_max)
+    return std_max

@@ -1,0 +1,157 @@
+<lipids>
+    <lipid name="CHOL" head="ROH" tail="C2">
+        <bead name="ROH" xyz="0 0 5.3"/>
+        <bead name="R1"  xyz="0 0 4.5"/>
+        <bead name="R2"  xyz="1 0 3.9"/>
+        <bead name="R3"  xyz="0 0 3.3"/>
+        <bead name="R4"  xyz="1 0 3.0"/>
+        <bead name="R5"  xyz="0 0 2.6"/>
+        <bead name="C1"  xyz="0 0 1.4"/>
+        <bead name="C2"  xyz="0 0 0"/>
+    </lipid>
+    <lipid name="ERG" head="ROH" tail="C2">
+        <bead name="ROH" xyz="0 0 5.3"/>
+        <bead name="R1"  xyz="0 0 4.5"/>
+        <bead name="R2"  xyz="1 0 3.9"/>
+        <bead name="R3"  xyz="0 0 3.3"/>
+        <bead name="R4"  xyz="1 0 3.0"/>
+        <bead name="R5"  xyz="0 0 2.6"/>
+        <bead name="C1"  xyz="0 0 1.4"/>
+        <bead name="C2"  xyz="0 0 0"/>
+    </lipid>
+    <lipid name="POPC" head="PO4" tail="C4B C4A">
+        <bead name="NC3" xyz="0 0 8"/>
+        <bead name="PO4"  xyz="0 0 7"/>
+        <bead name="GL1"  xyz="0 0 6"/>
+        <bead name="GL2"  xyz="0.5 0 6"/>
+        <bead name="C1A"  xyz="0 0 5"/>
+        <bead name="D2A"  xyz="0 0 4"/>
+        <bead name="C3A"  xyz="0 0 3"/>
+        <bead name="C4A"  xyz="0 0 2"/>
+        <bead name="C1B"  xyz="1 0 5"/>
+        <bead name="C2B"  xyz="1 0 4"/>
+        <bead name="C3B"  xyz="1 0 3"/>
+        <bead name="C4B"  xyz="1 0 2"/>
+    </lipid>
+    <lipid name="DPPC" head="PO4" tail="C4B C4A">
+        <bead name="NC3" xyz="0 0 8"/>
+        <bead name="PO4"  xyz="0 0 7"/>
+        <bead name="GL1"  xyz="0 0 6"/>
+        <bead name="GL2"  xyz="0.5 0 6"/>
+        <bead name="C1A"  xyz="0 0 5"/>
+        <bead name="C2A"  xyz="0 0 4"/>
+        <bead name="C3A"  xyz="0 0 3"/>
+        <bead name="C4A"  xyz="0 0 2"/>
+        <bead name="C1B"  xyz="1 0 5"/>
+        <bead name="C2B"  xyz="1 0 4"/>
+        <bead name="C3B"  xyz="1 0 3"/>
+        <bead name="C4B"  xyz="1 0 2"/>
+    </lipid>
+    <lipid name="DIPC" head="PO4" tail="C4B C4A">
+        <bead name="NC3" xyz="0 0 8"/>
+        <bead name="PO4"  xyz="0 0 7"/>
+        <bead name="GL1"  xyz="0 0 6"/>
+        <bead name="GL2"  xyz="0.5 0 6"/>
+        <bead name="C1A"  xyz="0 0 5"/>
+        <bead name="D2A"  xyz="0 0 4"/>
+        <bead name="D3A"  xyz="0 0 3"/>
+        <bead name="C4A"  xyz="0 0 2"/>
+        <bead name="C1B"  xyz="1 0 5"/>
+        <bead name="D2B"  xyz="1 0 4"/>
+        <bead name="D3B"  xyz="1 0 3"/>
+        <bead name="C4B"  xyz="1 0 2"/>
+    </lipid>
+    <lipid name="POPI" head="PO4" tail="C4B C4A">
+        <bead name="C1" xyz="0.5 0 8"/>
+        <bead name="C2" xyz="0.5 0 9"/>
+        <bead name="C3" xyz="0 0 9"/>
+        <bead name="PO4"  xyz="0 0 7"/>
+        <bead name="GL1"  xyz="0 0 6"/>
+        <bead name="GL2"  xyz="0.5 0 6"/>
+        <bead name="C1A"  xyz="0 0 5"/>
+        <bead name="D2A"  xyz="0 0 4"/>
+        <bead name="C3A"  xyz="0 0 3"/>
+        <bead name="C4A"  xyz="0 0 2"/>
+        <bead name="C1B"  xyz="1 0 5"/>
+        <bead name="C2B"  xyz="1 0 4"/>
+        <bead name="C3B"  xyz="1 0 3"/>
+        <bead name="C4B"  xyz="1 0 2"/>
+    </lipid>
+    <lipid name="DOPI" head="PO4" tail="C4B C4A">
+        <bead name="C1" xyz="0.5 0 8"/>
+        <bead name="C2" xyz="0.5 0 9"/>
+        <bead name="C3" xyz="0 0 9"/>
+        <bead name="PO4"  xyz="0 0 7"/>
+        <bead name="GL1"  xyz="0 0 6"/>
+        <bead name="GL2"  xyz="0.5 0 6"/>
+        <bead name="C1A"  xyz="0 0 5"/>
+        <bead name="D2A"  xyz="0 0 4"/>
+        <bead name="C3A"  xyz="0 0 3"/>
+        <bead name="C4A"  xyz="0 0 2"/>
+        <bead name="C1B"  xyz="1 0 5"/>
+        <bead name="D2B"  xyz="1 0 4"/>
+        <bead name="C3B"  xyz="1 0 3"/>
+        <bead name="C4B"  xyz="1 0 2"/>
+    </lipid>
+    <lipid name="DPPI" head="PO4" tail="C4B C4A">
+        <bead name="C1" xyz="0.5 0 8"/>
+        <bead name="C2" xyz="0.5 0 9"/>
+        <bead name="C3" xyz="0 0 9"/>
+        <bead name="PO4"  xyz="0 0 7"/>
+        <bead name="GL1"  xyz="0 0 6"/>
+        <bead name="GL2"  xyz="0.5 0 6"/>
+        <bead name="C1A"  xyz="0 0 5"/>
+        <bead name="C2A"  xyz="0 0 4"/>
+        <bead name="C3A"  xyz="0 0 3"/>
+        <bead name="C4A"  xyz="0 0 2"/>
+        <bead name="C1B"  xyz="1 0 5"/>
+        <bead name="C2B"  xyz="1 0 4"/>
+        <bead name="C3B"  xyz="1 0 3"/>
+        <bead name="C4B"  xyz="1 0 2"/>
+    </lipid>
+    <lipid name="SM18"  head="PO4" tail="C4B C4A">
+        <bead name="NC3" xyz="0 0 8"/>
+        <bead name="PO4"  xyz="0 0 7"/>
+        <bead name="AM1"  xyz="0 0 6"/>
+        <bead name="AM2"  xyz="0.5 0 6"/>
+        <bead name="C1A"  xyz="0 0 5"/>
+        <bead name="C2A"  xyz="0 0 4"/>
+        <bead name="C3A"  xyz="0 0 3"/>
+        <bead name="C4A"  xyz="0 0 2"/>
+        <bead name="C1B"  xyz="1 0 5"/>
+        <bead name="C2B"  xyz="1 0 4"/>
+        <bead name="C3B"  xyz="1 0 3"/>
+        <bead name="C4B"  xyz="1 0 2"/>
+    </lipid>
+    <lipid name="POSM"  head="PO4" tail="C4B C3A">
+        <bead name="NC3" xyz="0 0 8"/>
+        <bead name="PO4"  xyz="0 0 7"/>
+        <bead name="AM1"  xyz="0 0 6"/>
+        <bead name="AM2"  xyz="0.5 0 6"/>
+        <bead name="C1A"  xyz="0 0 5"/>
+        <bead name="C2A"  xyz="0 0 4"/>
+        <bead name="C3A"  xyz="0 0 3"/>
+        <bead name="C1B"  xyz="1 0 5"/>
+        <bead name="C2B"  xyz="1 0 4"/>
+        <bead name="C3B"  xyz="1 0 3"/>
+        <bead name="C4B"  xyz="1 0 2"/>
+    </lipid>
+    <lipid name="IPC" head="PO4" tail="C4B C4A">
+        <bead name="C1" xyz="0.5 0 8"/>
+        <bead name="C2" xyz="0.5 0 9"/>
+        <bead name="C3" xyz="0 0 9"/>
+        <bead name="PO4"  xyz="0 0 7"/>
+        <bead name="AM1"  xyz="0 0 6"/>
+        <bead name="AM2"  xyz="0.5 0 6"/>
+        <bead name="C1A"  xyz="0 0 5"/>
+        <bead name="C2A"  xyz="0 0 4"/>
+        <bead name="C3A"  xyz="0 0 3"/>
+        <bead name="C4A"  xyz="0 0 2"/>
+        <bead name="C1B"  xyz="1 0 5"/>
+        <bead name="C2B"  xyz="1 0 4"/>
+        <bead name="C3B"  xyz="1 0 3"/>
+        <bead name="C4B"  xyz="1 0 2"/>
+        <bead name="C5B"  xyz="1 0 1"/>
+        <bead name="C6B"  xyz="1 0 0"/>
+    </lipid>
+</lipids>

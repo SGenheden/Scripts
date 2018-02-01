@@ -132,6 +132,14 @@ class PDBFile :
     if filename != None :
       self.read(filename, **kwargs)
 
+  def atomindex(self, ambmask) :
+      atomnam = ambmask.split('@')[1]
+      resname = ambmask.split('@')[0][1:]
+      for i, atom in enumerate(self.atoms) :
+          if atom.name.strip() == atomnam and atom.resname.strip() == resname :
+              return i
+      return None
+
   def extend(self,other) :
     """
     Extend this structure with atoms and residues from another structure
@@ -706,6 +714,14 @@ class Residue :
           if atom.name.strip() == name :
               return atom
       return None
+  def index_by_name(self, name) :
+       """
+       Return an atom index in this residue by its name
+       """
+       for i, atom in enumerate(self.atoms):
+           if atom.name.strip() == name :
+               return i
+       return None
   def check_heavy(self) :
     """
     Check if an amino acid residue is complete

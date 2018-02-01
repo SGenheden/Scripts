@@ -127,7 +127,7 @@ if __name__ == '__main__':
     parser.add_argument('file', help="the PDB or GRO file")
     parser.add_argument('-i', '--include', help="the LAMMPS include file")
     parser.add_argument('-o', '--out', help="the output prefix", default="converted")
-    parser.add_argument('-b', '--box', type=float, nargs=3, help="the box dimensions", default=[0.0, 0.0, 0.0])
+    parser.add_argument('-b', '--box', type=float, nargs="+", help="the box dimensions", default=[0.0, 0.0, 0.0])
     parser.add_argument('-a', '--atomistic', nargs="+", help="data file(s) for atomistic solutes", default=[])
     parser.add_argument('-c', '--converter', help="the dictionary with conversion rules")
     parser.add_argument('-p', '--pairfunc', help="the pair function for the AA", default="lj/charmm/coul/long")
@@ -273,10 +273,13 @@ if __name__ == '__main__':
     data.dihedraltypes = [None] * len(include.dihedralparams)
 
     # Setting the box of the datafile
-    if all_coords.mean(axis=0).sum() > 10:  # Checking if center is at origin or not
-        data.box = [0.0, 0.0, 0.0, args.box[0], args.box[1], args.box[2]]
-    else:
-        data.box = [-args.box[0] / 2.0, -args.box[1] / 2.0, -args.box[2] / 2.0, args.box[0] / 2.0, args.box[1] / 2.0, args.box[2] / 2.0]
+    if len(args.box) == 6 :
+        data.box = args.box
+    else :
+        if all_coords.mean(axis=0).sum() > 10:  # Checking if center is at origin or not
+            data.box = [0.0, 0.0, 0.0, args.box[0], args.box[1], args.box[2]]
+        else:
+            data.box = [-args.box[0] / 2.0, -args.box[1] / 2.0, -args.box[2] / 2.0, args.box[0] / 2.0, args.box[1] / 2.0, args.box[2] / 2.0]
 
     # Setting correct type for all atoms
     if args.atomistic:

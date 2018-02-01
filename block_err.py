@@ -12,7 +12,7 @@ from sgenlib import parsing
 
 if __name__ == '__main__':
 
-    stde = sys.argv[1] == "-e"
+    stde = len(sys.argv) > 1 and sys.argv[1] == "-e"
     if stde :
         sys.argv.pop(1)
     nblocks = 2 if len(sys.argv) == 1 else int(sys.argv[1])

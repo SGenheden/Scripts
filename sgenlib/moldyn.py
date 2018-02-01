@@ -89,7 +89,7 @@ class TrajectoryProcessor(object):
         for i, action in enumerate(self.actions):
             action.add_arguments(self.argparser)
 
-        self.args = self.argparser.parse_args()
+        self.args = self.argparser.parse_args()        
         self.skip = self.args.skip
         self.dt = self.args.dt
         self.every = self.args.every
