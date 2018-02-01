@@ -3,6 +3,7 @@
 """
 Classes and routines to handle atom groups
 """
+from __future__ import division, print_function, absolute_import
 
 import sys
 import os
@@ -58,7 +59,7 @@ class AtomGroup :
         nadded = len(self.serials[self.atoms[0]])
         for atom in self.atoms[1:] :
             if len(self.serials[atom]) != nadded :
-                print nadded,len(self.serials[atom]),atom
+                print(nadded,len(self.serials[atom]),atom)
                 return -1
         return nadded
     def write_ndx(self, f, cutoff=20, split=False) :
@@ -214,8 +215,3 @@ def read_ndxfile(filename) :
         ndxdict[namestr[1:-1].strip()] =  \
             map(int, re.sub("\s+"," ",indexstr).strip().split())
     return ndxdict
-
-if __name__ == "__main__":
-
-  for g in read_groups(sys.argv[1]) :
-    print g

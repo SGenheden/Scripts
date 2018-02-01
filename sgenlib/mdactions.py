@@ -17,6 +17,7 @@ try :
 except:
     pass
 from scipy.spatial.distance import cdist
+import sklearn.mixture as mixture
 
 from . import pbc
 from . import geo
@@ -756,6 +757,7 @@ class MemDensAnalysis(TrajectoryAction) :
         self.edges = np.arange(zpos.min(),zpos.max()+self.resolution,self.resolution)
         self.zvals = 0.5 * (self.edges[:-1] + self.edges[1:]) * 0.1
 
+        self.ppos_curr = []
         self.pdensity_curr = np.zeros(self.edges.shape[0]-1)
         self.wdensity_curr = np.zeros(self.edges.shape[0]-1)
         self.pdensity = []
@@ -772,6 +774,7 @@ class MemDensAnalysis(TrajectoryAction) :
         zpos = self.phosphorsel.positions[:,2] - self.allsel.positions[:,2].mean()
         hist, b = np.histogram(zpos, bins=self.edges)
         self.pdensity_curr += hist
+        self.ppos_curr.extend(zpos)
 
         zpos = self.watersel.positions[:,2] - self.allsel.positions[:,2].mean()
         hist, b = np.histogram(zpos, bins=self.edges)
@@ -786,12 +789,10 @@ class MemDensAnalysis(TrajectoryAction) :
     def subsample(self) :
 
         # Calculate D_hh
-        midi = int(0.5 * self.pdensity_curr.shape[0])
-        dens_first = self.pdensity_curr[:midi]
-        dens_last = self.pdensity_curr[midi:]
-        max_first = np.argmax(dens_first)
-        max_last = midi + np.argmax(dens_last)
-        dhh =  (max_last -  max_first) * 0.1 * self.resolution
+        model = mixture.GaussianMixture(n_components=2)
+        model.fit(np.asarray(self.ppos_curr).reshape(-1,1))
+        dhh  = np.abs(model.means_[1][0]-model.means_[0][0]) * 0.1
+        self.ppos_curr = []
 
         # Calculate intercept of water and phosphor density,
         # and from that the membrane volume
