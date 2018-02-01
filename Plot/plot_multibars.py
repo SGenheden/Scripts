@@ -2,6 +2,9 @@
 
 """
 Program to make bar plots of data
+
+DOES NOT work great
+
 """
 
 import argparse
@@ -14,10 +17,11 @@ from sgenlib import parsing
 
 def _plot_single(data, errors, headers, barlabels, ylabel, fig):
 
-    a = fig.add_axes((0.15,0.15,0.75,0.75))
+    a = fig.add_axes((0.2,0.15,0.75,0.75))
 
     ngroups = data.shape[0]
     nitems = len(headers)
+    print ngroups, nitems
 
     gleft = 0.8*(np.arange(nitems)+1.0)
     width = gleft[-1] - gleft[0]
@@ -27,20 +31,24 @@ def _plot_single(data, errors, headers, barlabels, ylabel, fig):
     labels = []
     for i in range(ngroups):
         color.extend(gcolor)
-        labels.extend(barlabels)
-    a.bar(left, data.T.reshape(ngroups*nitems), yerr=errors.T.reshape(ngroups*nitems),
-            width=0.8, color=color, error_kw=dict(ecolor='k'))
-    a.set_xticks(left+0.4)
-    a.set_xticklabels(labels, rotation=45)
+        labels.extend("")
+    a.bar(left, data.reshape(ngroups*nitems), yerr=errors.reshape(ngroups*nitems),
+            width=0.8, color=color, error_kw=dict(ecolor='k'), label=headers)
+    a.set_xticks(left[::2]+width)
+    a.set_xticklabels(barlabels)
+    #a.legend()
+    h, l = a.get_legend_handles_labels()
+    a.legend(h[0], headers, loc='best', fancybox=True, framealpha=0.5,fontsize=8,labelspacing=0.20)
 
     for tick in a.xaxis.get_major_ticks() :
         tick.label.set_fontsize(8)
     for tick in a.yaxis.get_major_ticks() :
         tick.label.set_fontsize(8)
     a.set_ylim([data.min()-3.0,data.max()+3.0])
-    for i,h  in enumerate(headers):
-        a.text(left[nitems*i]+0.4,data.max()+4.0,h, size=10)
+    #for i,h  in enumerate(barlabels):
+    #    a.text(left[nitems*i]+0.4,data.min()-6.0,h, size=8)
     a.set_ylabel(ylabel, fontsize=8)
+    a.set_xlabel("Docking pose", fontsize=8)
 
 def _plot_multi(data, errors, headers, barlabels, nrow, ncol, fig):
 
@@ -72,12 +80,13 @@ if __name__ == '__main__' :
     barlabels = []
     data = []
     for line in lines[1:]:
-        cols = line.strip().split()
+        cols = line.strip().split("\t")
         barlabels.append(cols[0])
         data.append(cols[1:])
     data = np.array(data, dtype=float)
     errors = data[:,1::2]
     data = data[:,::2]
+    print data, errors, headers, barlabels
 
     if args.single :
         ncol = 1

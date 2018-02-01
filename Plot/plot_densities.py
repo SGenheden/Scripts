@@ -11,8 +11,34 @@ import numpy as np
 import matplotlib.pylab as plt
 
 from sgenlib import colors
-from sgenlib import parsing
-from sgenlib import mol
+
+def _parse_xvgfile(filename) :
+
+    lines = []
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+
+    i = 0
+    while lines[i].startswith("#") : i = i + 1
+
+    legends = []
+    while lines[i].startswith('@'):
+        if lines[i].find("yaxis  label") > 0 :
+            cols = lines[i].split('"')
+            ylabel = cols[-2]
+        elif re.search(" s\d+ legend",lines[i]):
+            cols = lines[i].split('"')
+            legends.append(cols[-2])
+        i = i + 1
+
+    data = []
+    while i < len(lines):
+        data.append(lines[i].strip().split())
+        i = i + 1
+    data = np.array(data, dtype=float)
+
+    densities = {l : col for l, col in zip(legends, data[:,1:].T)}
+    return data[:,0], densities, ylabel
 
 if __name__ == '__main__' :
 
@@ -27,10 +53,6 @@ if __name__ == '__main__' :
     parser.add_argument('--xlabel',help="the x label")
     parser.add_argument('--ylabel',help="the y label")
     parser.add_argument('--noyticks', action="store_true",help="turn on no y-ticks",default=False)
-    parser.add_argument('--nboots', type=int, default=0, help="the number of bootstraps")
-    parser.add_argument('--max',action="store_true", default=False, help="calculate the maxium position")
-    parser.add_argument('-a', '--area', type=float, nargs="+", help="membrane area")
-    parser.add_argument('--dump', action="store_true",help="turn on dumping of data to standard out",default=False)
     args = parser.parse_args()
 
     f = plt.figure(figsize=(3.33,2.5))
@@ -38,56 +60,21 @@ if __name__ == '__main__' :
 
     plotthis = []
     for fi, filename in enumerate(args.file) :
-        xvals, densities, ylabel = parsing.parse_densityfile(filename)
+        xvals, densities, ylabel = _parse_xvgfile(filename)
         midi = int(np.ceil(xvals.shape[0]/2.0))
-
-        if args.area is not None :
-            for d in densities :
-                densities[d] /= mol.density_scaling(xvals, args.area[fi])
-
         if args.shiftdens is not None:
             maxi = np.argmax(densities[args.shiftdens][:midi])
             xvals = xvals - xvals[:midi][maxi]
         if args.half :
             xvals = xvals[:midi]
-
         for di, density in enumerate(args.densities):
-            if len(args.file) == len(args.densities) :
-                if di != fi : continue
-                idx = di
-            else :
-                idx = di if len(args.file) == 1 else fi
-
+            idx = di if len(args.file) == 1 else fi
             y = densities[density]
             if args.half :
-                if len(y) % 2 == 0 :
-                    y = 0.5 * (y[:midi] + y[midi:][::-1])
-                else :
-                    y = 0.5 * (y[:midi] + y[midi-1:][::-1])
-#                y = y[:midi] # (y[:midi] + y[midi:][::-1]) * 0.5
+                y = y[:midi]
             if args.scale is not None:
                 y = y / args.scale[idx]
-
-            if args.nboots > 0 :
-                if args.max :
-                    dens_std, max_std = mol.bootstrap_density(y, xvals, nboots=args.nboots, calc_max=True)
-                else :
-                    dens_std = mol.bootstrap_density(y, xvals, nboots=args.nboots)
-                plt.fill_between(xvals, y-dens_std,y+dens_std, facecolor='grey',linewidth=0,alpha=0.4,interpolate=True)
             a.plot(xvals , y, "-", color=colors.color(idx),label=args.label[idx])
-
-            if args.dump :
-                for xi, yi in zip(xvals, y):
-                    print "%.3E %.3E"%(xi, yi)
-                print "---"
-
-            if args.max :
-                dmax = xvals[np.argmax(y)]
-                if args.nboots > 0 :
-                    print "Maxium peak at\t%.3f\t%.3f\twhich is %.3f\t%.3f"%(dmax, max_std, y.max(), dens_std[np.argmax(y)])
-                else :
-                    print "Maxium peak at\t%.3f\twhich is %.3f"%(dmax, y.max())
-
 
     if len(args.file) > 1 or len(args.densities) > 1 :
         a.legend(loc='best', fancybox=True, framealpha=0.5,fontsize=8,labelspacing=0.20)

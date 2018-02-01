@@ -58,3 +58,6 @@ Proj-fragments/*
 Proj-inla/*
 .ipynb_checkpoints/*
 Gmm/*
+Misc/
+
+Mol/make_tables
