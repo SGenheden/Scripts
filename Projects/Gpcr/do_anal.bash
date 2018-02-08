@@ -1,3 +1,4 @@
+# Author: Samuel Genheden samuel.genheden@gmail.com
 
 python2.7 ~/Programs/Scripts/Gpcr/gpcr_mdanal.py -x r${X}_md3_en_fit.xtc -s r1_md2.gro -p /local/scratch/sg6e12/data/Gpcr/Gpcr_anal/B2/Chol-30/ -a contacts -c 5 --skip 2 --reslist reslist
 

@@ -1,9 +1,12 @@
-Solvation
-=========
+# Solvation
 
 This folder contains scripts created while working on this paper:
 
-Genheden S., Predicting partition coefficients with a simple all-atom/coarse-grained hybrid model. *J. Chem. Theory Comput.*, **2015**, *in press*
+Genheden S., Predicting partition coefficients with a simple all-atom/coarse-grained hybrid model. *J. Chem. Theory Comput.*, **2015**, *12*, 297-304
+
+and
+
+Genheden S., Solvation free energies and partition coefficients with the coarse-grained and hybrid all-atom/coarse-grained MARTINI models *J. Comput-Aided. Mol Des.*, **2017**, *31*, 867-876
 
 They were written to be used with python version 2.7 and requires the following packages
 * [numpy](http://www.numpy.org/)

@@ -1,3 +1,4 @@
+# Author: Samuel Genheden samuel.genheden@gmail.com
 
 import sys
 

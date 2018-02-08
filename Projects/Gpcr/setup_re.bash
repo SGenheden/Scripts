@@ -1,3 +1,4 @@
+# Author: Samuel Genheden samuel.genheden@gmail.com
 
 prot=3d4s
 R=1
