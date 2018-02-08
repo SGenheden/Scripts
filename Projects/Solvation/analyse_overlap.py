@@ -6,9 +6,25 @@ The solutes are taken from the Minnesota solvation database
 """
 
 import argparse
+import re
 
 import dblib
 
+def _parse_info(form) :
+    """
+    Parse weight, number of atoms and number of heavy atoms from molecular formula
+    """
+    w = 0
+    n = 0
+    nh = 0
+    for part in re.findall("[A-Z]+[0-9]+",form):
+        m = re.match("([A-Z]+)([0-9]+)",part)
+        element = m.group(1)
+        number = int(m.group(2))
+        w += mass[element.capitalize()]*number
+        n += number
+        if element != "H" : nh += number
+    return w,n,nh
 
 if __name__ == '__main__':
 

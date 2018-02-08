@@ -7,6 +7,7 @@ No arguments are necessary, all structures are taken from standard locations
 """
 
 import os
+import sys
 
 import numpy as np
 
@@ -37,7 +38,7 @@ def _make_cra_colors(struct,colors=None) :
       if left > -1 and right > -1 :
         print "CRA: "+" ".join(res2.resname for res2 in struct.residues[left:right+1])
         for res2 in struct.residues[left:right+1] :
-          for atom in res2.atoms :  
+          for atom in res2.atoms :
             colors[atom.idx,:] = np.array([201.0/255.0,148.0/255.0,199.0/255.0])
   return colors
 
@@ -61,28 +62,29 @@ def _make_ccm_colors(struct,colors=None) :
       if left > -1 and right > -1 :
         print "CCM: "+" ".join(res2.resname for res2 in struct.residues[left:i+1])
         for res2 in struct.residues[left:i+1] :
-          for atom in res2.atoms :  
+          for atom in res2.atoms :
             colors[atom.idx,:] = np.array([216.0/255.0,179.0/255.0,101.0/255.0])
   return colors
 
 if __name__ == '__main__' :
 
-
+  respath = sys.argv[1]
   mols = "b2 b2_a a2a a2a_a".split()
   numbers = "A) B) C) D) E) F) G) H)".split()
   fig = plt.figure(1,figsize=(8,12))
-  
-  for i,mol in enumerate(mols) :
-  
+
+  for i, mol in enumerate(mols) :
+
     xray = gpcr_lib.load_xray(mol)
     pdb = xray.pdbfile
 
     # Make colour pattern due to pattern
     colors = _make_cra_colors(pdb)
     colors = _make_ccm_colors(pdb,colors)
+    restocolor = gpcr_lib.read_rescontacts(respath, mol)
 
     a = fig.add_subplot(len(mols),2,i*2+1,aspect="equal")
-    xray.plot(a,"low",reverseY=False,sidechain=True,colorscheme=colors,drawchol=False)
+    xray.plot(a,"low",reverseY=False,sidechain=True,colorscheme=colors,drawchol=False, specialres=restocolor)
     a.text(-35,33,numbers[(i*2)])
     a.text(-25,25,"Intra.",size=14)
     a.set_xticklabels([])
@@ -96,6 +98,9 @@ if __name__ == '__main__' :
       c = plt.Circle([-5,-27],radius=2.0,fc=[216.0/255.0,179.0/255.0,101.0/255.0],ec=[216.0/255.0,179.0/255.0,101.0/255.0])
       a.add_patch(c)
       a.text(-1,-28.5,"CCM",size=14)
+      c = plt.Circle([15,-27],radius=2.0,fc='k',ec='k')
+      a.add_patch(c)
+      a.text(20,-28.5,"Res.",size=14)
 
     a = fig.add_subplot(len(mols),2,i*2+2,aspect="equal")
     xray.plot(a,"upp",reverseY=True,sidechain=True,colorscheme=colors,drawchol=False)

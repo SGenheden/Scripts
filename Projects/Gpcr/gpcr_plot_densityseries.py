@@ -1,11 +1,11 @@
 # Author: Samuel Genheden samuel.genheden@gmail.com
 
 """
-Program plot time series of molecular densities 
+Program plot time series of molecular densities
 
 Examples
 --------
-gpcr_plot_densityseries.py -f r{1..5}_densities1.npz -o densities_series -d chol -m b2 
+gpcr_plot_densityseries.py -f r{1..5}_densities1.npz -o densities_series -d chol -m b2
 """
 
 import os
@@ -32,7 +32,7 @@ if __name__ == '__main__' :
   parser.add_argument('--max',type=float)
   parser.add_argument('--min',type=float)
   args = parser.parse_args()
-  
+
   # Read Xray structure and densities
   xray      = gpcr_lib.load_xray(args.mol)
   densities = [gpcr_lib.standard_read_and_process(args.files,args.density)]
@@ -41,7 +41,7 @@ if __name__ == '__main__' :
     densities.append(gpcr_lib.standard_read_and_process(filenames,args.density))
 
   if args.plot == "average" :
-    for d in densities : d.cutoff_av(cutoff=0.15)  
+    for d in densities : d.cutoff_av(cutoff=0.15)
 
   if args.max is None :
     maxval = max(*[d.max(args.plot) for d in densities])
@@ -57,8 +57,7 @@ if __name__ == '__main__' :
   for i,side in enumerate(["low","upp"],1) : # Loop over sides
     f = plt.figure(i)
     for i,(density,label,number) in enumerate(zip(densities,args.label,["A)","B)","C)","D)"]),1) :
-      a = f.add_subplot(2,2,i) 
-      im = gpcr_lib.plot_density_xray(a,density[side],args.plot,minval,maxval,xray,side,label,number,plotn=True)
+      a = f.add_subplot(2,2,i)
+      im = gpcr_lib.plot_density_xray(a,density[side],args.plot,minval,maxval,xray,side,label,number,plotn=False)
     gpcr_lib.draw_colormap(f,im)
     f.savefig("%s_%s_%s.png"%(args.out,args.density,side),format="png",dpi=300)
-

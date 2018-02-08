@@ -56,7 +56,7 @@ if __name__ == '__main__' :
   parser.add_argument('-p','--top',help="a topology file",default="system.top")
   parser.add_argument('-m','--mol',choices=["b2","a2a","b2_a","a2a_a"],help="the protein molecule")
   args = parser.parse_args()
-  
+
   # Read a Xrya structure file
   xray = gpcr_lib.load_xray(args.mol,loadsigma=True)
   pdb = xray.pdbfile
@@ -67,10 +67,10 @@ if __name__ == '__main__' :
       pdb.atoms.remove(atom)
     del pdb.residues[-1]
   pdb.xyz = np.array([atom.xyz for atom in pdb.atoms])
-  
+
   # Read a Gromacs topology file
   top = gmx.TopFile(args.top)
- 
+
   # Store away all interesting LJ parameter pairs
   roh_type = "SP1"  #"SC1"
   roh_pairs = []
@@ -83,11 +83,11 @@ if __name__ == '__main__' :
     if m.name == "Protein" : protein_type = m
   if protein_type is None :
     raise Exception("Could not find a protein molecule type")
- 
+
   # Check that the given structure is compatible with the found protein force field
   if len(protein_type.atoms) != len(pdb.atoms) :
     raise Exception("Different number of atoms in ff (%d) and structure (%d)"%(len(protein_type.atoms),len(pdb.atoms)))
- 
+
   # Store away LJ c6 and c12 coefficients
   c6 = np.zeros(len(protein_type.atoms))
   c12 = np.zeros(len(protein_type.atoms))
@@ -106,21 +106,21 @@ if __name__ == '__main__' :
     if not found :
       print "Incomplete force field spec for type %s"%atom.type
       quit()
-  
-  # Store some coordinate stats    
+
+  # Store some coordinate stats
   mincoord = pdb.xyz.min(axis=0)
   maxcoord = pdb.xyz.max(axis=0)
   midcoord = pdb.xyz.mean(axis=0)
-  
+
   # Determine the size of the box
   zlen = int(np.round(maxcoord[2]-mincoord[2]))
   if zlen % 2 != 0 : zlen = zlen + 1
-  xylen = 70  
+  xylen = 70
   grid = np.zeros([xylen,xylen,zlen])
 
   # Convert coordinates to nm
-  pdbxyz = pdb.xyz / 10.0 
-  
+  pdbxyz = pdb.xyz / 10.0
+
   # Loop over all the entire grid
   for x in range(-xylen/2,xylen/2+1) :
     for y in range(-xylen/2,xylen/2+1) :
@@ -135,28 +135,28 @@ if __name__ == '__main__' :
          #print gridcoord*10.0,lj.sum()
 
   grid[grid>0.0] = 0.0
-  
+
   # Write out the 3D grid
   origin = midcoord + np.array([-xylen/2,-xylen/2,-zlen/2])
   _writeDX(grid,origin,1.0,"gridenergy.dx")
-  
+
   # Plot 2D plot as average over z-dim
   grid_low = grid[:,:,:zlen/2].mean(axis=2)
   grid_upp = grid[:,:,zlen/2:].mean(axis=2)
- 
+
   fig = plt.figure(1)
   for i,(grid,leaflet) in enumerate(zip([grid_low,grid_upp],["low","upp"]),1) :
     a = fig.add_subplot(1,2,i)
     gridrm = np.ones([70,70,4])
     gridrm[grid<0.0,3] = 0.0
-    if leaflet == "upp" : 
+    if leaflet == "upp" :
       grid = grid[:,::-1]
       gridrm = gridrm[:,::-1]
     im = a.imshow(grid,extent=[-35,35,-35,35],origin="lower",cmap=plt.cm.YlOrRd_r)
     a.imshow(gridrm,extent=[-35,35,-35,35],origin="lower")
     gpcr_lib.plot_density_xray(a,None,"",0,0,xray,leaflet,gpcr_lib.side_name[leaflet].capitalize(),number=None,plotn=False,drawchol=False)
 
-  ax = gpcr_lib.draw_colormap(fig,im,text='[kJ/mol]')
-  ax.text(1.03,0.80,'Energy')
+  ax = gpcr_lib.draw_colormap(fig,im, text='')
+  ax.text(1.03,0.80,'$\mathrm{Energy}$')
 
   fig.savefig("gridenergy.png",format="png")

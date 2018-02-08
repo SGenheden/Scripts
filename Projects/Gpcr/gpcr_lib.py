@@ -1182,7 +1182,7 @@ def read_booleans(fileobj) :
   else :
     return False,[]
 
-def read_statefile(filename,every=1) :
+def read_statefile(filename,every=1,block=None) :
   """
   Read a state file from disc
   This is a file where on each line there is a bit string
@@ -1194,9 +1194,14 @@ def read_statefile(filename,every=1) :
       state.append(list)
       flag,list = read_booleans(f)
   if every == 1 :
-    return np.array(state,dtype=np.uint8)
+    state =  np.array(state,dtype=np.uint8)
   else :
-    return np.array(state,dtype=np.uint8)[::every]
+    state = np.array(state,dtype=np.uint8)[::every]
+  if block is not None:
+      n = int(float(state.shape[0]) / float(block[0]) * block[1])
+      return state[:n+1, :]
+  else:
+    return state
 
 def write_booleans(fileobj,list) :
   """
