@@ -287,6 +287,9 @@ class Connectivity :
     self.idx = int(cols[0])
     self.param = int(cols[1])
     self.atoms = [int(i) for i in cols[2:]]
+    if len(self.atoms) == 3 and self.atoms[1] == self.atoms[2] :
+        self.atoms[2] = 1
+        self.comment += " # modified to be compatible with latest LAMMPS version"
 
   def __str__(self) :
     return "%6d %2d %s %s"%(self.idx,self.param," ".join(["%6d"%i for i in self.atoms]),self.comment)
