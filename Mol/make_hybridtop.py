@@ -7,6 +7,9 @@ The AA structure should have the same order as the structure
 created by automartini. This is important since antechamber reshuffles
 the atoms.
 
+This script requires the branch write_virtualn of my version of parmed
+available at https://github.com/SGenheden/ParmEd/
+
 Examples:
     gmx_hybridtop.py -p AA=aa_gmx.top CG=cg_gmx.top -s aa.pdb -m map.dat
 """
